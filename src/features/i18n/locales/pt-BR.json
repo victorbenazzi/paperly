@@ -1,0 +1,41 @@
+{
+  "app": {
+    "name": "noteflow"
+  },
+  "titlebar": {
+    "toggleSidebar": "Alternar barra lateral",
+    "toggleAgent": "Alternar painel de IA"
+  },
+  "sidebar": {
+    "noVault": "Nenhum vault aberto",
+    "openVault": "Abrir vault",
+    "newPage": "Nova página",
+    "search": "Buscar"
+  },
+  "welcome": {
+    "title": "Suas notas, como arquivos de verdade.",
+    "subtitle": "O noteflow guarda tudo em Markdown comum no seu disco. Abra uma pasta como vault e comece a escrever. Seus agentes de IA leem e editam os mesmos arquivos.",
+    "openVault": "Abrir pasta como vault",
+    "hint": "Nada sai do seu Mac. Sem conta, sem sync, sem lock-in."
+  },
+  "editor": {
+    "empty": "Selecione uma nota na barra lateral, ou crie uma nova página."
+  },
+  "agent": {
+    "title": "Assistente",
+    "placeholder": "O painel de IA chega numa fase futura."
+  },
+  "settings": {
+    "theme": "Tema",
+    "themeSystem": "Sistema",
+    "themeLight": "Claro",
+    "themeDark": "Escuro",
+    "language": "Idioma"
+  },
+  "errors": {
+    "PathNotAllowed": "Esse caminho está fora dos seus vaults.",
+    "NotFound": "Arquivo não encontrado.",
+    "FileTooLarge": "Esse arquivo é grande demais para abrir aqui.",
+    "generic": "Algo deu errado: {{message}}"
+  }
+}

@@ -1,0 +1,123 @@
+/*
+ * noteflow design tokens. Notion-like: warm paper canvas, near-black ink,
+ * one structural blue accent, hairline borders, barely-there layered shadows.
+ * Light is the default; dark overrides via [data-theme="dark"] on <html>.
+ * Components never hardcode colors: they consume these vars (directly or
+ * through the Tailwind/shadcn mappings in index.css).
+ */
+
+:root,
+[data-theme="light"] {
+  /* surfaces */
+  --canvas: #ffffff;            /* editor / main content */
+  --canvas-soft: #f6f5f4;       /* app chrome: sidebar, panels, page background */
+  --surface: #ffffff;           /* cards, popovers, fields */
+  --surface-muted: #f1f0ef;     /* subtle wells, secondary buttons */
+  --hover: rgba(55, 53, 47, 0.06);
+  --hover-strong: rgba(55, 53, 47, 0.1);
+  --hairline: rgba(55, 53, 47, 0.11);
+  --hairline-strong: rgba(55, 53, 47, 0.2);
+  --overlay-scrim: rgba(15, 15, 15, 0.6);
+
+  /* ink */
+  --ink: #37352f;
+  --ink-secondary: #5f5e5b;
+  --ink-muted: #787774;
+  --ink-faint: #a39e98;
+
+  /* the single structural accent */
+  --accent: #0075de;
+  --accent-active: #005bab;
+  --accent-soft: rgba(0, 117, 222, 0.09);
+  --on-accent: #ffffff;
+
+  /* brand indigo (hero moments only, never structure) */
+  --indigo: #213183;
+
+  /* semantic */
+  --danger: #eb5757;
+  --danger-soft: rgba(235, 87, 87, 0.12);
+  --warning: #cb912f;
+  --success: #1aae39;
+
+  /* sticker palette: decorative only (page icons, category dots, illustrations) */
+  --sticker-sky: #62aef0;
+  --sticker-purple: #d6b6f6;
+  --sticker-purple-deep: #391c57;
+  --sticker-pink: #ff64c8;
+  --sticker-orange: #dd5b00;
+  --sticker-orange-deep: #793400;
+  --sticker-teal: #2a9d99;
+  --sticker-green: #1aae39;
+  --sticker-brown: #523410;
+
+  /* elevation: many near-transparent layers, never a hard cast */
+  --elevation-soft:
+    0 0.2px 1px rgba(0, 0, 0, 0.01),
+    0 0.8px 2.9px rgba(0, 0, 0, 0.02),
+    0 2px 7.8px rgba(0, 0, 0, 0.027),
+    0 4px 18px rgba(0, 0, 0, 0.04);
+  --elevation-elevated:
+    0 0 0 1px rgba(15, 15, 15, 0.04),
+    0 3px 6px rgba(15, 15, 15, 0.06),
+    0 9px 24px rgba(15, 15, 15, 0.1),
+    0 23px 52px rgba(0, 0, 0, 0.05);
+
+  /* motion */
+  --dur-fast: 150ms;
+  --dur-base: 200ms;
+  --dur-slow: 300ms;
+  --ease-out: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-theme="dark"] {
+  /* surfaces: Notion's warm dark, sidebar a step lighter than content */
+  --canvas: #191919;
+  --canvas-soft: #202020;
+  --surface: #252525;
+  --surface-muted: #2c2c2c;
+  --hover: rgba(255, 255, 255, 0.055);
+  --hover-strong: rgba(255, 255, 255, 0.09);
+  --hairline: rgba(255, 255, 255, 0.094);
+  --hairline-strong: rgba(255, 255, 255, 0.16);
+  --overlay-scrim: rgba(0, 0, 0, 0.65);
+
+  --ink: rgba(255, 255, 255, 0.9);
+  --ink-secondary: #c8c5bf;
+  --ink-muted: #9b9892;
+  --ink-faint: #6f6c66;
+
+  --accent: #4ba3f5;
+  --accent-active: #2e8de8;
+  --accent-soft: rgba(75, 163, 245, 0.14);
+  --on-accent: #ffffff;
+
+  --indigo: #182457;
+
+  --danger: #ff7369;
+  --danger-soft: rgba(255, 115, 105, 0.14);
+  --warning: #ffa344;
+  --success: #4dab57;
+
+  /* stickers stay playful but slightly muted in the dark */
+  --sticker-sky: #5499d8;
+  --sticker-purple: #b791dd;
+  --sticker-purple-deep: #d6b6f6;
+  --sticker-pink: #e255b8;
+  --sticker-orange: #cb6e34;
+  --sticker-orange-deep: #ffa344;
+  --sticker-teal: #389e9a;
+  --sticker-green: #4dab57;
+  --sticker-brown: #937264;
+
+  --elevation-soft:
+    0 0.2px 1px rgba(0, 0, 0, 0.06),
+    0 0.8px 2.9px rgba(0, 0, 0, 0.1),
+    0 2px 7.8px rgba(0, 0, 0, 0.14),
+    0 4px 18px rgba(0, 0, 0, 0.18);
+  --elevation-elevated:
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 3px 6px rgba(0, 0, 0, 0.2),
+    0 9px 24px rgba(0, 0, 0, 0.3),
+    0 23px 52px rgba(0, 0, 0, 0.25);
+}

@@ -1,0 +1,117 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+@import "@fontsource-variable/inter";
+@import "./styles/tokens.css";
+
+@custom-variant dark (&:is([data-theme="dark"] *));
+
+@theme inline {
+    --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
+    --font-heading: var(--font-sans);
+
+    /* shadcn semantic colors mapped onto the noteflow tokens */
+    --color-background: var(--canvas);
+    --color-foreground: var(--ink);
+    --color-card: var(--surface);
+    --color-card-foreground: var(--ink);
+    --color-popover: var(--surface);
+    --color-popover-foreground: var(--ink);
+    --color-primary: var(--accent);
+    --color-primary-foreground: var(--on-accent);
+    --color-secondary: var(--surface-muted);
+    --color-secondary-foreground: var(--ink);
+    --color-muted: var(--surface-muted);
+    --color-muted-foreground: var(--ink-muted);
+    --color-accent: var(--hover);
+    --color-accent-foreground: var(--ink);
+    --color-destructive: var(--danger);
+    --color-border: var(--hairline);
+    --color-input: var(--hairline-strong);
+    --color-ring: var(--accent);
+    --color-sidebar: var(--canvas-soft);
+    --color-sidebar-foreground: var(--ink-secondary);
+    --color-sidebar-primary: var(--accent);
+    --color-sidebar-primary-foreground: var(--on-accent);
+    --color-sidebar-accent: var(--hover);
+    --color-sidebar-accent-foreground: var(--ink);
+    --color-sidebar-border: var(--hairline);
+    --color-sidebar-ring: var(--accent);
+    --color-chart-1: var(--sticker-sky);
+    --color-chart-2: var(--sticker-teal);
+    --color-chart-3: var(--sticker-orange);
+    --color-chart-4: var(--sticker-pink);
+    --color-chart-5: var(--sticker-green);
+
+    /* noteflow tokens as first-class utilities (bg-canvas, text-ink, border-hairline...) */
+    --color-canvas: var(--canvas);
+    --color-canvas-soft: var(--canvas-soft);
+    --color-surface: var(--surface);
+    --color-surface-muted: var(--surface-muted);
+    --color-hover-wash: var(--hover);
+    --color-hover-wash-strong: var(--hover-strong);
+    --color-ink: var(--ink);
+    --color-ink-secondary: var(--ink-secondary);
+    --color-ink-muted: var(--ink-muted);
+    --color-ink-faint: var(--ink-faint);
+    --color-hairline: var(--hairline);
+    --color-hairline-strong: var(--hairline-strong);
+    --color-accent-blue: var(--accent);
+    --color-accent-blue-active: var(--accent-active);
+    --color-accent-blue-soft: var(--accent-soft);
+    --color-on-accent: var(--on-accent);
+    --color-indigo-night: var(--indigo);
+    --color-danger: var(--danger);
+    --color-danger-soft: var(--danger-soft);
+    --color-warning: var(--warning);
+    --color-success: var(--success);
+    --color-sticker-sky: var(--sticker-sky);
+    --color-sticker-purple: var(--sticker-purple);
+    --color-sticker-pink: var(--sticker-pink);
+    --color-sticker-orange: var(--sticker-orange);
+    --color-sticker-teal: var(--sticker-teal);
+    --color-sticker-green: var(--sticker-green);
+    --color-sticker-brown: var(--sticker-brown);
+
+    /* Notion radius scale: inputs 4, menu items 5, utility buttons 8, cards 12, wells 16 */
+    --radius-xs: 4px;
+    --radius-sm: 5px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --radius-2xl: 20px;
+    --radius-3xl: 24px;
+    --radius-4xl: 28px;
+
+    /* elevation utilities: shadow-soft / shadow-elevated */
+    --shadow-soft: var(--elevation-soft);
+    --shadow-elevated: var(--elevation-elevated);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+    }
+  body {
+    @apply bg-canvas-soft text-foreground;
+    font-feature-settings: "lnum" 1;
+    -webkit-font-smoothing: antialiased;
+    }
+  html {
+    @apply font-sans;
+    }
+
+  /* desktop app, not a web page */
+  body {
+    user-select: none;
+    cursor: default;
+    overscroll-behavior: none;
+  }
+  input,
+  textarea,
+  [contenteditable="true"],
+  .allow-select {
+    user-select: text;
+    cursor: auto;
+  }
+}

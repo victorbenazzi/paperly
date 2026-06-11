@@ -1,0 +1,41 @@
+{
+  "app": {
+    "name": "noteflow"
+  },
+  "titlebar": {
+    "toggleSidebar": "Toggle sidebar",
+    "toggleAgent": "Toggle AI panel"
+  },
+  "sidebar": {
+    "noVault": "No vault open",
+    "openVault": "Open vault",
+    "newPage": "New page",
+    "search": "Search"
+  },
+  "welcome": {
+    "title": "Your notes, as plain files.",
+    "subtitle": "noteflow keeps everything in ordinary Markdown on your disk. Open a folder as a vault and start writing. Your AI agents can read and edit the same files.",
+    "openVault": "Open folder as vault",
+    "hint": "Nothing leaves your Mac. No accounts, no sync, no lock-in."
+  },
+  "editor": {
+    "empty": "Select a note in the sidebar, or create a new page."
+  },
+  "agent": {
+    "title": "Assistant",
+    "placeholder": "The AI panel arrives in a later phase."
+  },
+  "settings": {
+    "theme": "Theme",
+    "themeSystem": "System",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "language": "Language"
+  },
+  "errors": {
+    "PathNotAllowed": "This path is outside your vaults.",
+    "NotFound": "File not found.",
+    "FileTooLarge": "This file is too large to open here.",
+    "generic": "Something went wrong: {{message}}"
+  }
+}
