@@ -19,6 +19,8 @@ import { useEditorStore } from "@/features/editor/editor.store";
 import { codec } from "@/features/editor/markdown/codec";
 import { useTreeStore } from "@/features/tree/tree.store";
 import { useNavStore } from "@/features/nav/nav.store";
+import { useVaultsStore, activeVault } from "@/features/vaults/vaults.store";
+import { uploadAssetToVault, resolveVaultFileUrl } from "@/features/assets/assets";
 import { stripMdExt, isMarkdown } from "@/features/tree/tree.types";
 import { errorMessage } from "@/lib/ipc";
 
@@ -82,7 +84,19 @@ function NoteTitle({ path }: { path: string }) {
 export function NoteEditor({ path }: { path: string }) {
   const { t } = useTranslation();
   const effective = useThemeStore((s) => s.effective);
-  const editor = useCreateBlockNote();
+  const vault = useVaultsStore((s) => activeVault(s));
+  const editor = useCreateBlockNote(
+    {
+      // Pasted/dropped files land in <vault>/assets/; the block keeps the
+      // vault-relative path (what the markdown stores), and resolveFileUrl
+      // turns it into a displayable object URL at render time.
+      uploadFile: vault ? (file: File) => uploadAssetToVault(vault.id, file) : undefined,
+      resolveFileUrl: vault
+        ? (url: string) => resolveVaultFileUrl(vault.path, url)
+        : undefined,
+    },
+    [vault?.id],
+  );
   const [ready, setReady] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const loadedFor = useRef<string | null>(null);

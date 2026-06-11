@@ -15,6 +15,7 @@ use crate::util::paths;
 use crate::vaults::VaultsCache;
 
 const DEFAULT_TEXT_LIMIT: u64 = 25 * 1024 * 1024; // 25 MiB
+const DEFAULT_BYTES_LIMIT: u64 = 50 * 1024 * 1024; // 50 MiB
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -43,6 +44,40 @@ pub struct TextFile {
     pub encoding: String,
     pub truncated: bool,
     pub size: u64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BytesFile {
+    pub b64: String,
+    pub mime: Option<String>,
+    pub truncated: bool,
+    pub size: u64,
+}
+
+pub fn guess_mime(path: &str) -> Option<String> {
+    let ext = Path::new(path)
+        .extension()
+        .and_then(|s| s.to_str())
+        .map(|s| s.to_lowercase())?;
+    let mime = match ext.as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "gif" => "image/gif",
+        "webp" => "image/webp",
+        "svg" => "image/svg+xml",
+        "bmp" => "image/bmp",
+        "ico" => "image/x-icon",
+        "avif" => "image/avif",
+        "pdf" => "application/pdf",
+        "mp4" => "video/mp4",
+        "webm" => "video/webm",
+        "mp3" => "audio/mpeg",
+        "wav" => "audio/wav",
+        "m4a" => "audio/mp4",
+        _ => return None,
+    };
+    Some(mime.to_string())
 }
 
 fn io_error(ctx: &str, e: std::io::Error) -> AppError {
@@ -179,6 +214,87 @@ pub fn read_file_text(app: &AppHandle, path: &str, max_bytes: Option<u64>) -> Ap
     let limit = max_bytes.unwrap_or(DEFAULT_TEXT_LIMIT);
     let (bytes, truncated, size) = read_capped(path, "read_file_text", limit)?;
     Ok(bytes_to_text(bytes, truncated, size))
+}
+
+pub fn read_file_bytes(app: &AppHandle, path: &str, max_bytes: Option<u64>) -> AppResult<BytesFile> {
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
+    require_within_roots(app, path)?;
+    let limit = max_bytes.unwrap_or(DEFAULT_BYTES_LIMIT);
+    let meta = Path::new(path).metadata().map_err(|e| io_error("read_file_bytes", e))?;
+    if meta.len() > limit {
+        return Err(AppError::FileTooLarge(format!(
+            "{path}: {} bytes (max {limit})",
+            meta.len()
+        )));
+    }
+    let bytes = fs::read(path).map_err(|e| io_error("read", e))?;
+    Ok(BytesFile {
+        b64: STANDARD.encode(&bytes),
+        mime: guess_mime(path),
+        truncated: false,
+        size: meta.len(),
+    })
+}
+
+/// Persist pasted/dropped bytes into `<vault>/assets/`, returning the
+/// vault-relative path that goes into the markdown (`assets/<name>`).
+/// The stored name is `<slug>-<6 random chars>.<ext>` to avoid collisions.
+pub fn save_asset(
+    app: &AppHandle,
+    vault_id: &str,
+    file_name: &str,
+    bytes_b64: &str,
+) -> AppResult<String> {
+    use base64::{engine::general_purpose::STANDARD, Engine as _};
+
+    let cache = app.state::<Arc<VaultsCache>>();
+    let root = cache
+        .path_of(vault_id)
+        .ok_or_else(|| AppError::NotFound(format!("vault {vault_id}")))?;
+
+    let bytes = STANDARD
+        .decode(bytes_b64)
+        .map_err(|e| AppError::Other(format!("invalid base64: {e}")))?;
+    if bytes.len() as u64 > DEFAULT_BYTES_LIMIT {
+        return Err(AppError::FileTooLarge(format!(
+            "asset: {} bytes (max {DEFAULT_BYTES_LIMIT})",
+            bytes.len()
+        )));
+    }
+
+    // Sanitize to a flat basename: keep the extension, slugify the stem.
+    let base = Path::new(file_name)
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("asset");
+    let (stem, ext) = match base.rsplit_once('.') {
+        Some((s, e)) if !s.is_empty() => (s, e.to_lowercase()),
+        _ => (base, "bin".to_string()),
+    };
+    let slug: String = stem
+        .chars()
+        .map(|c| if c.is_alphanumeric() { c.to_ascii_lowercase() } else { '-' })
+        .collect::<String>()
+        .trim_matches('-')
+        .chars()
+        .take(40)
+        .collect();
+    let slug = if slug.is_empty() { "asset".to_string() } else { slug };
+    let suffix: String = uuid::Uuid::new_v4()
+        .to_string()
+        .replace('-', "")
+        .chars()
+        .take(6)
+        .collect();
+    let name = format!("{slug}-{suffix}.{ext}");
+
+    let assets_dir = Path::new(&root).join("assets");
+    fs::create_dir_all(&assets_dir).map_err(|e| io_error("save_asset: mkdir", e))?;
+    let target = assets_dir.join(&name);
+    let target_str = target.to_string_lossy().to_string();
+    require_within_roots(app, &target_str)?;
+    atomic_write(&target, &bytes)?;
+    Ok(format!("assets/{name}"))
 }
 
 /// Atomic write: `<path>.<ext>.noteflow.tmp` then rename.

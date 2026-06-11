@@ -56,6 +56,9 @@ pub fn run() {
             commands::filesystem::delete_path,
             commands::filesystem::move_path,
             commands::filesystem::reveal_in_finder,
+            commands::filesystem::read_file_bytes,
+            commands::filesystem::vault_save_asset,
+            commands::filesystem::open_with_default_app,
             // workspace
             commands::workspace::save_workspace_state,
             commands::workspace::load_workspace_state,

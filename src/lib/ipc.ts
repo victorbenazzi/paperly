@@ -26,6 +26,9 @@ export const CMD = {
   deletePath: "delete_path",
   movePath: "move_path",
   revealInFinder: "reveal_in_finder",
+  readFileBytes: "read_file_bytes",
+  vaultSaveAsset: "vault_save_asset",
+  openWithDefaultApp: "open_with_default_app",
   // workspace
   saveWorkspaceState: "save_workspace_state",
   loadWorkspaceState: "load_workspace_state",
@@ -103,6 +106,13 @@ export interface FileMeta {
 export interface TextFile {
   content: string;
   encoding: string;
+  truncated: boolean;
+  size: number;
+}
+
+export interface BytesFile {
+  b64: string;
+  mime: string | null;
   truncated: boolean;
   size: number;
 }

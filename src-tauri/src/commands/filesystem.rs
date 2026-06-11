@@ -4,7 +4,7 @@
 use tauri::AppHandle;
 
 use crate::error::AppResult;
-use crate::fs_ops::{self, DirEntry, FileMeta, TextFile};
+use crate::fs_ops::{self, BytesFile, DirEntry, FileMeta, TextFile};
 
 #[tauri::command]
 pub async fn read_dir(path: String, app: AppHandle) -> AppResult<Vec<DirEntry>> {
@@ -34,6 +34,44 @@ pub async fn write_file_text(path: String, content: String, app: AppHandle) -> A
     tauri::async_runtime::spawn_blocking(move || fs_ops::write_file_text(&app, &path, &content))
         .await
         .map_err(|e| crate::error::AppError::Other(format!("join: {e}")))?
+}
+
+#[tauri::command]
+pub async fn read_file_bytes(
+    path: String,
+    max_bytes: Option<u64>,
+    app: AppHandle,
+) -> AppResult<BytesFile> {
+    tauri::async_runtime::spawn_blocking(move || fs_ops::read_file_bytes(&app, &path, max_bytes))
+        .await
+        .map_err(|e| crate::error::AppError::Other(format!("join: {e}")))?
+}
+
+#[tauri::command]
+pub async fn vault_save_asset(
+    vault_id: String,
+    file_name: String,
+    bytes_b64: String,
+    app: AppHandle,
+) -> AppResult<String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        fs_ops::save_asset(&app, &vault_id, &file_name, &bytes_b64)
+    })
+    .await
+    .map_err(|e| crate::error::AppError::Other(format!("join: {e}")))?
+}
+
+#[tauri::command]
+pub async fn open_with_default_app(path: String, app: AppHandle) -> AppResult<()> {
+    use std::sync::Arc;
+    use tauri::Manager;
+    let cache = app.state::<Arc<crate::vaults::VaultsCache>>();
+    crate::util::paths::ensure_within_roots(&path, &cache.roots())?;
+    std::process::Command::new("open")
+        .arg(&path)
+        .spawn()
+        .map_err(|e| crate::error::AppError::Other(format!("open: {e}")))?;
+    Ok(())
 }
 
 #[tauri::command]

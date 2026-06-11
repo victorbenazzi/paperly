@@ -5,7 +5,8 @@ import { MainHeader } from "@/components/layout/MainHeader";
 import { AgentPanel } from "@/components/layout/AgentPanel";
 import { NoteView } from "@/components/editor/NoteView";
 import { NoteEditor } from "@/components/editor/NoteEditor";
-import { isMarkdown } from "@/features/tree/tree.types";
+import { ImageView } from "@/components/editor/ImageView";
+import { IMAGE_EXTS, isMarkdown } from "@/features/tree/tree.types";
 import { WelcomeScreen } from "@/app/WelcomeScreen";
 import { useUiStore } from "@/features/ui/ui.store";
 import { useVaultsStore } from "@/features/vaults/vaults.store";
@@ -35,6 +36,8 @@ export function AppShell() {
           {openPath ? (
             isMarkdown(openPath.split("/").pop() ?? "") ? (
               <NoteEditor key={openPath} path={openPath} />
+            ) : IMAGE_EXTS.has(openPath.split(".").pop()?.toLowerCase() ?? "") ? (
+              <ImageView path={openPath} />
             ) : (
               <NoteView path={openPath} />
             )

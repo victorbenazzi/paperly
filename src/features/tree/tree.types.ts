@@ -19,6 +19,12 @@ export const IMAGE_EXTS = new Set([
   "png", "jpg", "jpeg", "gif", "webp", "svg", "bmp", "ico", "avif",
 ]);
 
+/** Non-markdown files we still open in-app as raw text. */
+export const TEXT_EXTS = new Set([
+  "txt", "text", "log", "json", "jsonc", "yaml", "yml", "toml", "csv", "tsv",
+  "xml", "html", "css", "js", "ts", "sh", "py", "rs",
+]);
+
 function extOf(name: string): string {
   const i = name.lastIndexOf(".");
   return i === -1 ? "" : name.slice(i + 1).toLowerCase();

@@ -4,8 +4,12 @@
 import { describe, expect, it } from "vitest";
 import { BlockNoteEditor } from "@blocknote/core";
 
-function makeEditor() {
-  return BlockNoteEditor.create({ _headless: true });
+function makeEditor(): BlockNoteEditor {
+  // _headless is the (typed-as-internal) flag server-util uses; fine in tests.
+  const options = { _headless: true } as unknown as Parameters<
+    typeof BlockNoteEditor.create
+  >[0];
+  return BlockNoteEditor.create(options);
 }
 
 async function roundtrip(md: string): Promise<string> {

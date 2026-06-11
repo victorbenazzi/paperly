@@ -12,7 +12,7 @@ import {
 
 import { cn } from "@/lib/utils";
 import { errorMessage } from "@/lib/ipc";
-import type { TreeNode } from "@/features/tree/tree.types";
+import { TEXT_EXTS, type TreeNode } from "@/features/tree/tree.types";
 import { useTreeStore } from "@/features/tree/tree.store";
 import { useDragStore } from "@/features/tree/drag.store";
 import { useNavStore } from "@/features/nav/nav.store";
@@ -86,8 +86,15 @@ export function TreeItem({ node, depth, expanded, onToggle }: TreeItemProps) {
 
   const activate = () => {
     select(node.path);
-    if (isPage || node.kind === "image" || node.kind === "file") openNote(node.path);
-    else if (node.kind === "folder") onToggle();
+    if (isPage || node.kind === "image") {
+      openNote(node.path);
+    } else if (node.kind === "file") {
+      const ext = node.name.split(".").pop()?.toLowerCase() ?? "";
+      if (TEXT_EXTS.has(ext)) openNote(node.path);
+      else void ipc(CMD.openWithDefaultApp, { path: node.path }).catch(() => {});
+    } else if (node.kind === "folder") {
+      onToggle();
+    }
   };
 
   const commitRename = async () => {
