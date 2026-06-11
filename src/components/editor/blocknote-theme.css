@@ -1,0 +1,39 @@
+/*
+ * BlockNote themed by the noteflow tokens. Since 0.48 the editor reads its
+ * CSS vars from .bn-root; both light and dark resolve through [data-theme],
+ * so the editor follows the app theme with zero JS.
+ */
+
+.bn-root,
+.bn-container {
+  --bn-colors-editor-text: var(--ink);
+  --bn-colors-editor-background: var(--canvas);
+  --bn-colors-menu-text: var(--ink);
+  --bn-colors-menu-background: var(--surface);
+  --bn-colors-tooltip-text: var(--ink-secondary);
+  --bn-colors-tooltip-background: var(--surface-muted);
+  --bn-colors-hovered-text: var(--ink);
+  --bn-colors-hovered-background: var(--hover);
+  --bn-colors-selected-text: var(--on-accent);
+  --bn-colors-selected-background: var(--accent);
+  --bn-colors-disabled-text: var(--ink-faint);
+  --bn-colors-disabled-background: transparent;
+  --bn-colors-shadow: rgba(15, 15, 15, 0.07);
+  --bn-colors-border: var(--hairline);
+  --bn-colors-side-menu: var(--ink-faint);
+  --bn-colors-highlight-blue-text: var(--accent);
+
+  --bn-font-family: var(--font-sans, 'Inter Variable', sans-serif);
+  --bn-border-radius: 8px;
+}
+
+/* The editor surface is the page itself: no inner padding fighting ours. */
+.bn-editor {
+  padding-inline: 0;
+  background: transparent;
+}
+
+/* Notion-quiet selection */
+.bn-editor ::selection {
+  background: var(--accent-soft);
+}

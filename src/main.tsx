@@ -6,10 +6,12 @@ import ReactDOM from "react-dom/client";
 import "./index.css";
 import "@/features/i18n/config";
 import { initThemeListener } from "@/features/theme/theme.store";
+import { initEditorFlushListeners } from "@/features/editor/editor.store";
 
 import App from "./App";
 
 initThemeListener();
+initEditorFlushListeners();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>

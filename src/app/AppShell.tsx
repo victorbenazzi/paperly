@@ -4,6 +4,8 @@ import { Sidebar } from "@/components/layout/Sidebar";
 import { MainHeader } from "@/components/layout/MainHeader";
 import { AgentPanel } from "@/components/layout/AgentPanel";
 import { NoteView } from "@/components/editor/NoteView";
+import { NoteEditor } from "@/components/editor/NoteEditor";
+import { isMarkdown } from "@/features/tree/tree.types";
 import { WelcomeScreen } from "@/app/WelcomeScreen";
 import { useUiStore } from "@/features/ui/ui.store";
 import { useVaultsStore } from "@/features/vaults/vaults.store";
@@ -30,7 +32,15 @@ export function AppShell() {
       <main className="flex min-w-0 flex-1 flex-col bg-canvas">
         <MainHeader />
         <div className="min-h-0 flex-1 overflow-auto">
-          {openPath ? <NoteView path={openPath} /> : <WelcomeScreen />}
+          {openPath ? (
+            isMarkdown(openPath.split("/").pop() ?? "") ? (
+              <NoteEditor key={openPath} path={openPath} />
+            ) : (
+              <NoteView path={openPath} />
+            )
+          ) : (
+            <WelcomeScreen />
+          )}
         </div>
       </main>
 
