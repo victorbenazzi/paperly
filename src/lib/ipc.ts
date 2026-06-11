@@ -8,6 +8,27 @@ export const CMD = {
   // settings
   readSettings: "read_settings",
   writeSettings: "write_settings",
+  // vaults
+  vaultList: "vault_list",
+  vaultAdd: "vault_add",
+  vaultCreate: "vault_create",
+  vaultRemove: "vault_remove",
+  vaultRename: "vault_rename",
+  vaultSetActive: "vault_set_active",
+  // filesystem
+  readDir: "read_dir",
+  stat: "stat",
+  readFileText: "read_file_text",
+  writeFileText: "write_file_text",
+  createFile: "create_file",
+  createDir: "create_dir",
+  renamePath: "rename_path",
+  deletePath: "delete_path",
+  movePath: "move_path",
+  revealInFinder: "reveal_in_finder",
+  // workspace
+  saveWorkspaceState: "save_workspace_state",
+  loadWorkspaceState: "load_workspace_state",
 } as const;
 
 export type CmdName = (typeof CMD)[keyof typeof CMD];
@@ -46,4 +67,42 @@ export function errorMessage(err: unknown): string {
   if (isAppError(err)) return err.message;
   if (err instanceof Error) return err.message;
   return String(err);
+}
+
+/* Shared payload types, mirrored from the Rust structs (camelCase serde). */
+
+export interface Vault {
+  id: string;
+  name: string;
+  path: string;
+  createdAt: string;
+  lastOpenedAt: string;
+}
+
+export interface VaultsFile {
+  vaults: Vault[];
+  lastActiveVaultId: string | null;
+}
+
+export interface DirEntry {
+  name: string;
+  path: string;
+  isDir: boolean;
+  isSymlink: boolean;
+  size: number;
+  mtimeMs: number;
+}
+
+export interface FileMeta {
+  size: number;
+  mtimeMs: number;
+  isDir: boolean;
+  isSymlink: boolean;
+}
+
+export interface TextFile {
+  content: string;
+  encoding: string;
+  truncated: boolean;
+  size: number;
 }

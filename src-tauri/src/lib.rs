@@ -1,7 +1,11 @@
 mod commands;
 mod config_paths;
 mod error;
+mod fs_ops;
 mod util;
+mod vaults;
+
+use std::sync::Arc;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -22,13 +26,39 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_process::init())
-        .setup(|_app| {
+        .manage(Arc::new(vaults::VaultsCache::default()))
+        .setup(|app| {
+            use tauri::Manager;
+            // dirs must exist BEFORE anything persists
             config_paths::ensure_dirs()?;
+            vaults::hydrate(&app.app_handle().clone())?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            // settings
             commands::settings::read_settings,
             commands::settings::write_settings,
+            // vaults
+            commands::vaults::vault_list,
+            commands::vaults::vault_add,
+            commands::vaults::vault_create,
+            commands::vaults::vault_remove,
+            commands::vaults::vault_rename,
+            commands::vaults::vault_set_active,
+            // filesystem
+            commands::filesystem::read_dir,
+            commands::filesystem::stat,
+            commands::filesystem::read_file_text,
+            commands::filesystem::write_file_text,
+            commands::filesystem::create_file,
+            commands::filesystem::create_dir,
+            commands::filesystem::rename_path,
+            commands::filesystem::delete_path,
+            commands::filesystem::move_path,
+            commands::filesystem::reveal_in_finder,
+            // workspace
+            commands::workspace::save_workspace_state,
+            commands::workspace::load_workspace_state,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

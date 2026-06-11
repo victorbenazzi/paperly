@@ -2,6 +2,7 @@ import { useTranslation } from "react-i18next";
 import { FolderOpen } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { useVaultsStore } from "@/features/vaults/vaults.store";
 
 const STICKERS = [
   "var(--sticker-sky)",
@@ -14,6 +15,7 @@ const STICKERS = [
 
 export function WelcomeScreen() {
   const { t } = useTranslation();
+  const addViaDialog = useVaultsStore((s) => s.addViaDialog);
 
   return (
     <div className="flex h-full items-center justify-center">
@@ -39,7 +41,11 @@ export function WelcomeScreen() {
           {t("welcome.subtitle")}
         </p>
 
-        <Button size="lg" className="mt-8 gap-2 rounded-full px-6">
+        <Button
+          size="lg"
+          className="mt-8 gap-2 rounded-full px-6"
+          onClick={() => void addViaDialog()}
+        >
           <FolderOpen size={16} />
           {t("welcome.openVault")}
         </Button>

@@ -9,8 +9,20 @@
   "sidebar": {
     "noVault": "No vault open",
     "openVault": "Open vault",
+    "removeVault": "Remove vault from list",
     "newPage": "New page",
     "search": "Search"
+  },
+  "tree": {
+    "untitled": "Untitled",
+    "rename": "Rename",
+    "delete": "Move to Trash",
+    "reveal": "Reveal in Finder",
+    "newSubpage": "New subpage",
+    "more": "More options"
+  },
+  "noteView": {
+    "loading": "Loading..."
   },
   "welcome": {
     "title": "Your notes, as plain files.",
