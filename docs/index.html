@@ -448,22 +448,22 @@
             <strong>Baixe o Paperly.</strong> Mac de 2020 em diante (chip M1, M2, M3...) usa o botão <strong>Baixar para Mac</strong>. Macs mais antigos, com processador Intel, usam <strong>Mac Intel</strong>.
           </li>
           <li>
-            <strong>Instale.</strong> Abra o arquivo <span class="kbd">.dmg</span> baixado e arraste o Paperly para a pasta <strong>Aplicativos</strong>.
-          </li>
-          <li>
-            <strong>Libere o app no Terminal.</strong> Aperte <span class="kbd">⌘ Cmd</span> + <span class="kbd">Espaço</span>, digite <em>Terminal</em>, dê Enter. Cole o comando abaixo e aperte Enter. Ele pede a senha do seu Mac e, ao digitar, nada aparece na tela; é normal, digite e confirme.
+            <strong>Libere o arquivo no Terminal.</strong> O macOS atual bloqueia até a abertura do <span class="kbd">.dmg</span> baixado (“não foi possível verificar se está livre de malware”). Aperte <span class="kbd">⌘ Cmd</span> + <span class="kbd">Espaço</span>, digite <em>Terminal</em>, dê Enter, cole o comando abaixo e aperte Enter. Sem senha, sem mistério. Se o download não estiver na pasta Downloads, ajuste o caminho.
             <div class="terminal">
               <span class="dollar">$</span>
-              <code id="cmd">sudo xattr -cr /Applications/Paperly.app</code>
+              <code id="cmd">xattr -d com.apple.quarantine ~/Downloads/Paperly_*.dmg</code>
               <button class="copy-btn" id="copy" type="button">Copiar</button>
             </div>
             <div class="why">
-              <p><strong>Por que esse comando?</strong> Todo app baixado da internet ganha do macOS uma marca de “quarentena”. Apps só escapam do aviso de “desenvolvedor não identificado” quando o criador paga o selo de notarização da Apple, US$&nbsp;99 por ano. O Paperly é gratuito e ainda não paga esse selo, então o macOS bloquearia a abertura.</p>
-              <p>O comando faz uma única coisa: remove a marca de quarentena <em>deste</em> app, dizendo ao sistema que você confia nele. Nenhuma proteção do macOS é desativada para o resto da máquina. E como o Paperly é open source, o código que roda aí é público e auditável no GitHub.</p>
+              <p><strong>Por que esse comando?</strong> Todo arquivo baixado da internet ganha do macOS uma marca de “quarentena”, e o sistema só abre sem aviso o que tem o selo de notarização da Apple, que custa US$&nbsp;99 por ano pro desenvolvedor. O Paperly é gratuito e ainda não paga esse selo, então o macOS recusa até o instalador.</p>
+              <p>O comando faz uma única coisa: remove a marca de quarentena <em>deste</em> arquivo, dizendo ao sistema que você confia nele. O app que você arrastar de dentro dele já sai liberado, e nenhuma proteção do macOS é desativada para o resto da máquina. E como o Paperly é open source, o código que roda aí é público e auditável no GitHub.</p>
             </div>
           </li>
           <li>
-            <strong>Pronto.</strong> Abra o Paperly normalmente. Quando sair uma versão nova, uma pílula azul aparece no topo do app: um clique baixa, instala e reabre sozinho.
+            <strong>Instale.</strong> Agora abra o <span class="kbd">.dmg</span> normalmente e arraste o Paperly para a pasta <strong>Aplicativos</strong>.
+          </li>
+          <li>
+            <strong>Pronto.</strong> Abra o Paperly. Quando sair uma versão nova, uma pílula azul aparece no topo do app: um clique baixa, instala e reabre sozinho.
           </li>
         </ol>
       </div>

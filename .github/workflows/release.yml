@@ -174,12 +174,14 @@ jobs:
             ### Auto-update
             Already running a previous version? Paperly checks for this release on launch and shows a blue **Update** pill in the title bar. One click: download, install, relaunch. No reinstall.
 
-            ### macOS signature notice
-            These builds are signed with a stable self-signed certificate, so macOS keeps the permissions you grant across auto-updates. They are NOT notarized by Apple, so on first install macOS still quarantines them. After dragging Paperly into `/Applications`, run once in Terminal:
+            ### macOS install note
+            These builds are signed with a stable self-signed certificate (so permissions survive auto-updates) but NOT notarized by Apple. Current macOS refuses to even open the downloaded `.dmg` ("Apple could not verify..."), with no override button. Clear the quarantine flag once in Terminal, then open the `.dmg` normally:
 
             ```bash
-            sudo xattr -cr /Applications/Paperly.app
+            xattr -d com.apple.quarantine ~/Downloads/Paperly_*.dmg
             ```
+
+            (adjust the path if your browser saves downloads elsewhere). The app you drag to `/Applications` inherits the cleared flag and opens normally.
 
             > _Notarization (what removes this step entirely) needs Apple's $99/year Developer Program. Until then, it's one terminal command on first install. Your granted permissions survive updates._
 

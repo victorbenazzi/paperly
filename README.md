@@ -18,10 +18,10 @@ Open the [latest release](https://github.com/victorbenazzi/paperly/releases/late
 
 Everything else in the assets list (`.sig`, `.app.tar.gz`, `latest.json`, source archives) belongs to the auto-updater; ignore it.
 
-macOS builds are signed with a stable self-signed certificate (not notarized). After dragging Paperly into `/Applications`, run once:
+macOS builds are signed with a stable self-signed certificate (not notarized), so current macOS refuses to even open the downloaded `.dmg`. Clear the quarantine flag once, then open the `.dmg` normally; the app you drag to `/Applications` inherits the cleared flag:
 
 ```bash
-sudo xattr -cr /Applications/Paperly.app
+xattr -d com.apple.quarantine ~/Downloads/Paperly_*.dmg
 ```
 
 ### Auto-update
