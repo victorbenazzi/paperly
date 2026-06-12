@@ -17,6 +17,8 @@ import { useTreeStore } from "@/features/tree/tree.store";
 import { useDragStore, dragJustEnded } from "@/features/tree/drag.store";
 import { useNavStore } from "@/features/nav/nav.store";
 import { usePageMetaStore } from "@/features/pages/pageMeta.store";
+import { closeDeletedPaths, remapPagePaths } from "@/features/pages/pagePaths";
+import { renamePage } from "@/features/pages/renamePage";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -60,10 +62,9 @@ export function TreeItem({ node, depth, expanded, onToggle }: TreeItemProps) {
   const toggleExpanded = useTreeStore((s) => s.toggleExpanded);
   const createFolder = useTreeStore((s) => s.createFolder);
   const openNote = useNavStore((s) => s.open);
-  const remapNav = useNavStore((s) => s.remap);
 
   const dragging = useDragStore((s) => s.dragging);
-  const dropDir = useDragStore((s) => s.dropDir);
+  const dropTarget = useDragStore((s) => s.target);
   const beginDrag = useDragStore((s) => s.begin);
 
   const isPage = node.kind === "note" || node.kind === "folderNote";
@@ -95,11 +96,17 @@ export function TreeItem({ node, depth, expanded, onToggle }: TreeItemProps) {
   }, [renaming, node.name]);
 
   const expandable = node.dirPath !== null;
-  const isDropTarget = dragging && node.dirPath && dropDir === node.dirPath && dragging.path !== node.path;
-  // Dropping onto a plain note/file lands NEXT to it (its parent dir), so a
-  // drag over any row always has a sensible target instead of falling
-  // through to the vault root.
-  const dropDirForRow = node.dirPath ?? node.path.slice(0, node.path.lastIndexOf("/"));
+  const isDropTarget =
+    dragging !== null &&
+    dropTarget?.kind === "into" &&
+    node.dirPath !== null &&
+    dropTarget.dir === node.dirPath;
+  // Insertion line: this row renders it when the hovered slot is one of its
+  // edges (reorder feedback, Notion-style).
+  const dropLine =
+    dragging !== null && dropTarget?.kind === "line" && dropTarget.line.rowPath === node.path
+      ? dropTarget.line
+      : null;
 
   const activate = () => {
     if (dragJustEnded()) return;
@@ -120,10 +127,15 @@ export function TreeItem({ node, depth, expanded, onToggle }: TreeItemProps) {
     startRename(null);
     if (!name || name === node.name) return;
     try {
-      const newPath = await renameNode(node.path, node.dirPath, name);
-      remapNav(node.path, newPath);
-      if (node.dirPath) remapNav(node.dirPath, newPath.replace(/\.md$/i, ""));
-      select(newPath);
+      if (isPage) {
+        // Canonical page rename: flushes the editor first and re-points
+        // nav, editor, icon cache and selection at the new paths.
+        await renamePage(node.path, name);
+      } else {
+        const newPath = await renameNode(node.path, node.dirPath, name);
+        remapPagePaths(node.path, newPath);
+        select(newPath);
+      }
     } catch (err) {
       console.error("rename failed:", errorMessage(err));
     }
@@ -169,6 +181,7 @@ export function TreeItem({ node, depth, expanded, onToggle }: TreeItemProps) {
 
   const remove = async () => {
     try {
+      closeDeletedPaths(node.path, node.dirPath);
       await deleteNode(node.path, node.dirPath);
     } catch (err) {
       console.error("delete failed:", errorMessage(err));
@@ -181,9 +194,14 @@ export function TreeItem({ node, depth, expanded, onToggle }: TreeItemProps) {
 
   const row = (
     <div
-      data-drop-dir={dropDirForRow}
+      data-tree-row
+      data-path={node.path}
+      data-name={node.name}
+      data-parent={node.path.slice(0, node.path.lastIndexOf("/"))}
+      data-dir={node.dirPath ?? undefined}
+      data-expanded={expanded ? "1" : undefined}
       className={cn(
-        "group flex h-7 cursor-pointer items-center gap-1 rounded-sm pr-1 text-sm",
+        "group relative flex h-7 cursor-pointer items-center gap-1 rounded-sm pr-1 text-sm",
         "text-ink-secondary transition-colors duration-(--dur-fast)",
         selected ? "bg-hover-wash-strong text-ink" : "hover:bg-hover-wash hover:text-ink",
         isDropTarget && "bg-accent-blue-soft outline-1 outline-accent-blue/50 -outline-offset-1",
@@ -211,6 +229,20 @@ export function TreeItem({ node, depth, expanded, onToggle }: TreeItemProps) {
         pressRef.current = null;
       }}
     >
+      {dropLine ? (
+        // Insertion indicator: a line on the row edge where the drop lands,
+        // indented one extra level when it means "first child of this folder".
+        <span
+          className="pointer-events-none absolute right-1 z-10 flex items-center"
+          style={{
+            left: `${8 + (depth + (dropLine.indented ? 1 : 0)) * 14}px`,
+            [dropLine.rowEdge === "above" ? "top" : "bottom"]: "-4px",
+          }}
+        >
+          <span className="size-[7px] shrink-0 rounded-full border-[1.5px] border-accent-blue bg-canvas" />
+          <span className="h-[3px] min-w-0 flex-1 rounded-full bg-accent-blue" />
+        </span>
+      ) : null}
       <span
         className={cn(
           "flex size-4 shrink-0 items-center justify-center text-ink-faint",

@@ -34,7 +34,10 @@ export default defineConfig(async () => ({
       : undefined,
     watch: {
       // 3. tell Vite to ignore watching `src-tauri`
-      ignored: ["**/src-tauri/**"],
+      // 4. ignore the bundled example vaults: opening one in the app writes
+      //    into them (autosave), and a watch event here full-reloads the
+      //    webview mid-session, throwing navigation back to the persisted page
+      ignored: ["**/src-tauri/**", "**/examples/**"],
     },
   },
 }));

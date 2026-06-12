@@ -25,6 +25,7 @@ import { useVaultsStore, activeVault } from "@/features/vaults/vaults.store";
 import { uploadAssetToVault, resolveVaultFileUrl } from "@/features/assets/assets";
 import { stripMdExt, isMarkdown } from "@/features/tree/tree.types";
 import { renamePage } from "@/features/pages/renamePage";
+import { internalLinkDecorations } from "@/components/editor/internalLinks";
 import { useOutlineStore, type OutlineHeading } from "@/features/outline/outline.store";
 import { IconPickerPopover } from "@/components/page/EmojiPicker";
 import { errorMessage } from "@/lib/ipc";
@@ -166,6 +167,8 @@ export function NoteEditor({ path }: { path: string }) {
       resolveFileUrl: vault
         ? (url: string) => resolveVaultFileUrl(vault.path, url)
         : undefined,
+      // Notion-style page links: emoji (or default glyph) + soft underline.
+      extensions: vault ? [internalLinkDecorations(vault.path)] : undefined,
     },
     [vault?.id],
   );

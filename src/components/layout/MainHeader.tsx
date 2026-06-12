@@ -8,6 +8,7 @@ import { useUiStore } from "@/features/ui/ui.store";
 import { useVaultsStore, activeVault } from "@/features/vaults/vaults.store";
 import { useNavStore } from "@/features/nav/nav.store";
 import { useTreeStore } from "@/features/tree/tree.store";
+import { closeDeletedPaths } from "@/features/pages/pagePaths";
 import { Button } from "@/components/ui/button";
 import { Breadcrumb } from "@/components/layout/Breadcrumb";
 import {
@@ -26,7 +27,6 @@ export function MainHeader() {
   const toggleAgentPanel = useUiStore((s) => s.toggleAgentPanel);
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
   const openPath = useNavStore((s) => s.openPath);
-  const closeNote = useNavStore((s) => s.close);
   const deleteNode = useTreeStore((s) => s.deleteNode);
 
   const reveal = () => {
@@ -41,8 +41,8 @@ export function MainHeader() {
       ? openPath.slice(0, openPath.length - name.length) + stripMdExt(name)
       : null;
     try {
+      closeDeletedPaths(openPath, dirPath);
       await deleteNode(openPath, dirPath);
-      closeNote();
     } catch (err) {
       console.error("delete failed:", errorMessage(err));
     }

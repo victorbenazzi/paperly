@@ -1,5 +1,6 @@
 ---
 icon: 📣
+updated: 2026-06-12T16:24:57.460Z
 ---
 
 # Campanhas
@@ -8,10 +9,10 @@ Uma pasta por campanha. A folder note (como esta) guarda o status; as páginas d
 
 ## Ativas
 
-| Campanha | Status | Dono | Data alvo |
-| --- | --- | --- | --- |
-| [[Lançamento 2026]] | Em andamento | Sofia | 15/09/2026 |
-| SEO contínuo | Sempre ativa | Marcos | n/a |
+| Campanha                                               | Status       | Dono       | Data alvo  |
+| ------------------------------------------------------ | ------------ | ---------- | ---------- |
+| [[Lançamento 2026]] | Em andamento | Sofia      | 15/09/2026 |
+| SEO contínuo                                           | Sempre ativa | Marcos     | n/a        |
 
 ## Arquivo
 

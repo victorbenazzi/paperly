@@ -1,5 +1,6 @@
 ---
 icon: 🎨
+updated: 2026-06-12T15:44:44.838Z
 ---
 
 # Brand
@@ -8,8 +9,8 @@ The source of truth for how Paperly looks and sounds. If a piece of copy or a de
 
 ## Pages
 
-- [[Brand Guidelines]]: logo, color and typography rules
-- [[Voice and Tone]]: how we write, everywhere
+* [[Brand Guidelines]]: logo, color and typography rules
+* [[Voice and Tone]]: how we write, everywhere
 
 ## Ground rules
 

@@ -11,7 +11,11 @@
     "openVault": "Abrir vault",
     "collapse": "Fechar",
     "expand": "Abrir",
-    "removeVault": "Remover vault da lista",
+    "removeVault": "Remover do Paperly",
+    "renameVault": "Renomear vault",
+    "renameVaultHint": "Também renomeia a pasta no disco",
+    "vaultOptions": "Opções do vault",
+    "back": "Voltar",
     "newPage": "Nova página",
     "newFolder": "Nova pasta",
     "search": "Buscar"

@@ -19,6 +19,9 @@ pub struct Vault {
     pub path: String,
     pub created_at: String,
     pub last_opened_at: String,
+    /// Emoji shown in the switcher instead of the initial letter.
+    #[serde(default)]
+    pub icon: Option<String>,
 }
 
 /// On-disk shape of `state/vaults.json`: registry + last-active id in one
@@ -136,6 +139,7 @@ pub fn add(app: &AppHandle, path: String) -> AppResult<Vault> {
         path: path.clone(),
         created_at: now.clone(),
         last_opened_at: now,
+        icon: None,
     };
     file.vaults.push(vault.clone());
     file.last_active_vault_id = Some(vault.id.clone());
@@ -187,10 +191,16 @@ pub fn remove(app: &AppHandle, id: &str) -> AppResult<()> {
     Ok(())
 }
 
+/// Rename a vault: the FOLDER on disk moves with it (name and basename stay
+/// coupled, same as `add`). The watcher self-heals because the frontend
+/// re-watches when the vault's path changes.
 pub fn rename(app: &AppHandle, id: &str, name: String) -> AppResult<Vault> {
     let trimmed = name.trim().to_string();
     if trimmed.is_empty() {
         return Err(AppError::Other("name cannot be empty".into()));
+    }
+    if trimmed.contains('/') || trimmed.contains('\\') || trimmed == "." || trimmed == ".." {
+        return Err(AppError::Other("invalid vault name".into()));
     }
     let mut file = load_file()?;
     let idx = file
@@ -198,7 +208,34 @@ pub fn rename(app: &AppHandle, id: &str, name: String) -> AppResult<Vault> {
         .iter()
         .position(|v| v.id == id)
         .ok_or_else(|| AppError::NotFound(format!("vault {id}")))?;
+
+    let old_path = std::path::PathBuf::from(&file.vaults[idx].path);
+    if old_path.file_name().and_then(|s| s.to_str()) != Some(trimmed.as_str()) {
+        let parent = old_path
+            .parent()
+            .ok_or_else(|| AppError::Other("vault has no parent directory".into()))?;
+        let new_path = parent.join(&trimmed);
+        if new_path.exists() {
+            return Err(AppError::Other(format!("already exists: {}", new_path.display())));
+        }
+        std::fs::rename(&old_path, &new_path)
+            .map_err(|e| AppError::Other(format!("rename vault dir: {e}")))?;
+        file.vaults[idx].path = new_path.to_string_lossy().into_owned();
+    }
     file.vaults[idx].name = trimmed;
+    save_file(&file)?;
+    app.state::<Arc<VaultsCache>>().replace(file.vaults.clone());
+    Ok(file.vaults.into_iter().nth(idx).unwrap())
+}
+
+pub fn set_icon(app: &AppHandle, id: &str, icon: Option<String>) -> AppResult<Vault> {
+    let mut file = load_file()?;
+    let idx = file
+        .vaults
+        .iter()
+        .position(|v| v.id == id)
+        .ok_or_else(|| AppError::NotFound(format!("vault {id}")))?;
+    file.vaults[idx].icon = icon.filter(|s| !s.trim().is_empty());
     save_file(&file)?;
     app.state::<Arc<VaultsCache>>().replace(file.vaults.clone());
     Ok(file.vaults.into_iter().nth(idx).unwrap())

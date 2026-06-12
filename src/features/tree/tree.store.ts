@@ -10,15 +10,28 @@ import { isMarkdown, stripMdExt } from "./tree.types";
 interface TreeState {
   dirCache: Record<string, DirEntry[]>;
   expanded: Set<string>;
+  /** True once the user toggled any folder this session; the persisted
+      expansion set must not override what they just did. */
+  expandedTouched: boolean;
   selectedPath: string | null;
   /** Inline editor state: a node being renamed, or a new item being named. */
   renamingPath: string | null;
+  /**
+   * Manual sibling order per dir: display names, written by drag-reorder.
+   * UI state only (persisted in the vault's workspace file), never touches
+   * the markdown on disk. Names not listed sort after the ordered block.
+   */
+  order: Record<string, string[]>;
 
   loadDir: (dirPath: string) => Promise<void>;
   toggleExpanded: (dirPath: string) => void;
   setExpanded: (dirs: string[]) => void;
   select: (path: string | null) => void;
   startRename: (path: string | null) => void;
+  /** Replace one dir's manual order (drag-reorder drop). */
+  setOrder: (dirPath: string, names: string[]) => void;
+  /** Bulk restore from the persisted workspace state. */
+  setOrderMap: (order: Record<string, string[]>) => void;
   /** Drop cached listings for these dirs and re-list the ones still loaded. */
   invalidateDirs: (dirPaths: string[]) => Promise<void>;
   /**
@@ -27,6 +40,10 @@ interface TreeState {
    * dir) and every loaded dir underneath it.
    */
   handleFsChange: (paths: string[]) => void;
+  /** The vault root folder moved on disk (vault rename): re-key every state
+      entry holding absolute paths. The dir cache is dropped instead of
+      remapped; rendering reloads it lazily under the new root. */
+  remapRoot: (from: string, to: string) => void;
   reset: () => void;
 
   createNote: (parentDir: string, baseName: string) => Promise<string>;
@@ -50,11 +67,65 @@ async function listDir(dirPath: string): Promise<DirEntry[]> {
   return ipc<DirEntry[]>(CMD.readDir, { path: dirPath });
 }
 
+/** Swap a name inside one dir's order list, keeping its slot. */
+function renameInOrder(
+  order: Record<string, string[]>,
+  dirPath: string,
+  oldName: string,
+  newName: string,
+): Record<string, string[]> {
+  const names = order[dirPath];
+  if (!names?.includes(oldName)) return order;
+  return { ...order, [dirPath]: names.map((n) => (n === oldName ? newName : n)) };
+}
+
+/** Remove a name from one dir's order list. */
+function dropFromOrder(
+  order: Record<string, string[]>,
+  dirPath: string,
+  name: string,
+): Record<string, string[]> {
+  const names = order[dirPath];
+  if (!names?.includes(name)) return order;
+  return { ...order, [dirPath]: names.filter((n) => n !== name) };
+}
+
+/**
+ * Order entries are keyed by absolute dir path, so a dir that renames, moves
+ * or dies must carry (or drop) every entry under it; otherwise the workspace
+ * file accumulates dead keys forever. `toDir: null` deletes the subtree.
+ */
+function remapOrderDirs(
+  order: Record<string, string[]>,
+  fromDir: string,
+  toDir: string | null,
+): Record<string, string[]> {
+  let changed = false;
+  const next: Record<string, string[]> = {};
+  for (const [dir, names] of Object.entries(order)) {
+    if (dir !== fromDir && !dir.startsWith(`${fromDir}/`)) {
+      next[dir] = names;
+      continue;
+    }
+    changed = true;
+    if (toDir !== null) next[toDir + dir.slice(fromDir.length)] = names;
+  }
+  return changed ? next : order;
+}
+
+/** Tree display name of an entry: notes lose the extension. */
+function displayNameOf(path: string): string {
+  const base = path.split("/").pop()!;
+  return isMarkdown(base) ? stripMdExt(base) : base;
+}
+
 export const useTreeStore = create<TreeState>((set, get) => ({
   dirCache: {},
   expanded: new Set<string>(),
+  expandedTouched: false,
   selectedPath: null,
   renamingPath: null,
+  order: {},
 
   loadDir: async (dirPath) => {
     const entries = await listDir(dirPath);
@@ -66,7 +137,7 @@ export const useTreeStore = create<TreeState>((set, get) => ({
       const expanded = new Set(s.expanded);
       if (expanded.has(dirPath)) expanded.delete(dirPath);
       else expanded.add(dirPath);
-      return { expanded };
+      return { expanded, expandedTouched: true };
     });
     if (get().expanded.has(dirPath) && !get().dirCache[dirPath]) {
       void get().loadDir(dirPath);
@@ -82,6 +153,10 @@ export const useTreeStore = create<TreeState>((set, get) => ({
 
   select: (path) => set({ selectedPath: path }),
   startRename: (path) => set({ renamingPath: path }),
+
+  setOrder: (dirPath, names) =>
+    set((s) => ({ order: { ...s.order, [dirPath]: names } })),
+  setOrderMap: (order) => set({ order: order ?? {} }),
 
   invalidateDirs: async (dirPaths) => {
     const { dirCache } = get();
@@ -101,8 +176,27 @@ export const useTreeStore = create<TreeState>((set, get) => ({
     if (toReload.size > 0) void get().invalidateDirs([...toReload]);
   },
 
+  remapRoot: (from, to) => {
+    const remap = (p: string) =>
+      p === from ? to : p.startsWith(`${from}/`) ? to + p.slice(from.length) : p;
+    set((s) => ({
+      dirCache: {},
+      expanded: new Set([...s.expanded].map(remap)),
+      selectedPath: s.selectedPath ? remap(s.selectedPath) : null,
+      renamingPath: null,
+      order: remapOrderDirs(s.order, from, to),
+    }));
+  },
+
   reset: () =>
-    set({ dirCache: {}, expanded: new Set(), selectedPath: null, renamingPath: null }),
+    set({
+      dirCache: {},
+      expanded: new Set(),
+      expandedTouched: false,
+      selectedPath: null,
+      renamingPath: null,
+      order: {},
+    }),
 
   createNote: async (parentDir, baseName) => {
     const entries = get().dirCache[parentDir] ?? (await listDir(parentDir));
@@ -141,6 +235,13 @@ export const useTreeStore = create<TreeState>((set, get) => ({
         throw err;
       }
     }
+    set((s) => {
+      let order = renameInOrder(s.order, parentOf(path), displayNameOf(path), newDisplayName);
+      // Folder (or folder-note companion) renamed: re-key the orders beneath it.
+      const oldDir = isNote ? dirPath : path;
+      if (oldDir) order = remapOrderDirs(order, oldDir, isNote ? stripMdExt(newPath) : newPath);
+      return { order };
+    });
     await get().invalidateDirs([parentOf(path)]);
     return newPath;
   },
@@ -150,6 +251,11 @@ export const useTreeStore = create<TreeState>((set, get) => ({
     if (dirPath && dirPath !== path) {
       await ipc(CMD.deletePath, { path: dirPath }).catch(() => {});
     }
+    set((s) => {
+      let order = dropFromOrder(s.order, parentOf(path), displayNameOf(path));
+      if (dirPath) order = remapOrderDirs(order, dirPath, null);
+      return { order };
+    });
     await get().invalidateDirs([parentOf(path)]);
     if (get().selectedPath === path) set({ selectedPath: null });
   },
@@ -166,6 +272,13 @@ export const useTreeStore = create<TreeState>((set, get) => ({
         throw err;
       }
     }
+    set((s) => {
+      let order = dropFromOrder(s.order, parentOf(path), displayNameOf(path));
+      if (dirPath) {
+        order = remapOrderDirs(order, dirPath, `${targetDir}/${dirPath.split("/").pop()!}`);
+      }
+      return { order };
+    });
     await get().invalidateDirs([parentOf(path), targetDir]);
     return newPath;
   },

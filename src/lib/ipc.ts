@@ -14,6 +14,7 @@ export const CMD = {
   vaultCreate: "vault_create",
   vaultRemove: "vault_remove",
   vaultRename: "vault_rename",
+  vaultSetIcon: "vault_set_icon",
   vaultSetActive: "vault_set_active",
   // filesystem
   readDir: "read_dir",
@@ -42,10 +43,14 @@ export const CMD = {
 
 export type CmdName = (typeof CMD)[keyof typeof CMD];
 
+/** Plain-browser dev (vite without Tauri): route IPC to the in-memory mock. */
+const useMock = import.meta.env.DEV && !("__TAURI_INTERNALS__" in window);
+
 export async function ipc<T = unknown>(
   cmd: CmdName,
   args?: Record<string, unknown>,
 ): Promise<T> {
+  if (useMock) return (await import("./ipc.mock")).mockIpc<T>(cmd, args);
   return tauriInvoke<T>(cmd, args);
 }
 
@@ -86,6 +91,8 @@ export interface Vault {
   path: string;
   createdAt: string;
   lastOpenedAt: string;
+  /** Emoji shown in the switcher instead of the initial letter. */
+  icon: string | null;
 }
 
 export interface VaultsFile {

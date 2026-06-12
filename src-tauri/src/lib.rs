@@ -50,6 +50,7 @@ pub fn run() {
             commands::vaults::vault_create,
             commands::vaults::vault_remove,
             commands::vaults::vault_rename,
+            commands::vaults::vault_set_icon,
             commands::vaults::vault_set_active,
             // filesystem
             commands::filesystem::read_dir,

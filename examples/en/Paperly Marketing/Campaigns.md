@@ -1,5 +1,6 @@
 ---
 icon: 📣
+updated: 2026-06-12T15:44:43.793Z
 ---
 
 # Campaigns
@@ -8,10 +9,10 @@ One folder per campaign. The folder note (like this one) holds status; the pages
 
 ## Active
 
-| Campaign | Status | Owner | Target date |
-| --- | --- | --- | --- |
-| [[Product Launch 2026]] | In progress | Sofia | 2026-09-15 |
-| Always-on SEO | Ongoing | Marcos | n/a |
+| Campaign                                                    | Status      | Owner      | Target date |
+| ----------------------------------------------------------- | ----------- | ---------- | ----------- |
+| [[Product Launch 2026]] | In progress | Sofia      | 2026-09-15  |
+| Always-on SEO                                               | Ongoing     | Marcos     | n/a         |
 
 ## Archive
 

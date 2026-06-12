@@ -11,7 +11,11 @@
     "openVault": "Open vault",
     "collapse": "Close",
     "expand": "Open",
-    "removeVault": "Remove vault from list",
+    "removeVault": "Remove from Paperly",
+    "renameVault": "Rename vault",
+    "renameVaultHint": "Also renames the folder on disk",
+    "vaultOptions": "Vault options",
+    "back": "Back",
     "newPage": "New page",
     "newFolder": "New folder",
     "search": "Search"

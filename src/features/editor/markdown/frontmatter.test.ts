@@ -8,12 +8,18 @@ describe("splitFrontmatter", () => {
     expect(splitFrontmatter(text)).toEqual({ meta: {}, body: text });
   });
 
-  it("splits valid YAML frontmatter", () => {
+  it("splits valid YAML frontmatter, dropping the separator blank line", () => {
     const text = "---\nicon: 🤖\ncover: assets/c.png\n---\n\n# Title\n";
     const { meta, body } = splitFrontmatter(text);
     expect(meta.icon).toBe("🤖");
     expect(meta.cover).toBe("assets/c.png");
-    expect(body).toBe("\n# Title\n");
+    expect(body).toBe("# Title\n");
+  });
+
+  it("split then join is byte-stable, so a visit alone never re-saves", () => {
+    const text = "---\nicon: 🤖\n---\n\n# Title\n\nBody.\n";
+    const { meta, body } = splitFrontmatter(text);
+    expect(joinFrontmatter(meta, body)).toBe(text);
   });
 
   it("treats broken YAML as plain body (never destroys data)", () => {
@@ -36,7 +42,7 @@ describe("joinFrontmatter", () => {
     const joined = joinFrontmatter({ icon: "🌱" }, "# T\n\nbody\n");
     const { meta, body } = splitFrontmatter(joined);
     expect(meta.icon).toBe("🌱");
-    expect(body.trimStart()).toBe("# T\n\nbody\n");
+    expect(body).toBe("# T\n\nbody\n");
   });
 
   it("drops undefined keys", () => {

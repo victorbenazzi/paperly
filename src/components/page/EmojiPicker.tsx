@@ -13,7 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
  * support React 19); we mount it imperatively. `data`/`i18n` are passed
  * locally so the picker never fetches from a CDN (offline-first).
  */
-function EmojiGrid({ onPick }: { onPick: (emoji: string) => void }) {
+export function EmojiGrid({ onPick }: { onPick: (emoji: string) => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const effective = useThemeStore((s) => s.effective);
   const { i18n } = useTranslation();

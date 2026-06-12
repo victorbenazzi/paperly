@@ -33,7 +33,14 @@ export function splitFrontmatter(text: string): SplitNote {
     if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
       return { meta: {}, body: text };
     }
-    return { meta: parsed as NoteMeta, body: text.slice(match[0].length) };
+    // The blank line after the frontmatter block is formatting, not body.
+    // Serializers never emit a leading newline, so leaving it here would make
+    // every read differ from its own round-trip and re-save the file (with a
+    // fresh `updated`) on every visit. joinFrontmatter writes it back on save.
+    return {
+      meta: parsed as NoteMeta,
+      body: text.slice(match[0].length).replace(/^(?:\r?\n)+/, ""),
+    };
   } catch {
     return { meta: {}, body: text };
   }
@@ -45,5 +52,5 @@ export function joinFrontmatter(meta: NoteMeta, body: string): string {
   if (keys.length === 0) return body;
   const slim: Record<string, unknown> = {};
   for (const k of keys) slim[k] = meta[k];
-  return `---\n${stringifyYaml(slim).trimEnd()}\n---\n\n${body.replace(/^\n+/, "")}`;
+  return `---\n${stringifyYaml(slim).trimEnd()}\n---\n\n${body.replace(/^(?:\r?\n)+/, "")}`;
 }

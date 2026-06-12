@@ -35,6 +35,7 @@ export function isMarkdown(name: string): boolean {
   return e === "md" || e === "markdown";
 }
 
+/** Also strips on full paths: `.../X.md` -> `.../X` (a folder note's companion dir). */
 export function stripMdExt(name: string): string {
   return name.replace(/\.(md|markdown)$/i, "");
 }
@@ -43,8 +44,13 @@ export function stripMdExt(name: string): string {
  * Merge a directory listing into presentation nodes, Notion-style:
  * `X.md` next to a folder `X/` collapses into ONE expandable page node
  * (folderNote). The disk keeps both entries; only the tree view merges them.
+ *
+ * `order` is the manual sibling order (node display names) written by
+ * drag-reorder. Names in it come first, in that sequence; anything not listed
+ * (new files, external creations) keeps the default grouped-alphabetical
+ * order, after the ordered block. Stale names are simply ignored.
  */
-export function buildNodes(entries: DirEntry[]): TreeNode[] {
+export function buildNodes(entries: DirEntry[], order?: string[]): TreeNode[] {
   const dirsByName = new Map<string, DirEntry>();
   for (const e of entries) {
     if (e.isDir) dirsByName.set(e.name, e);
@@ -89,5 +95,14 @@ export function buildNodes(entries: DirEntry[]): TreeNode[] {
     if (r !== 0) return r;
     return a.name.toLowerCase().localeCompare(b.name.toLowerCase());
   });
+
+  if (order && order.length > 0) {
+    const pos = new Map(order.map((name, i) => [name, i]));
+    const ordered: TreeNode[] = [];
+    const rest: TreeNode[] = [];
+    for (const n of nodes) (pos.has(n.name) ? ordered : rest).push(n);
+    ordered.sort((a, b) => pos.get(a.name)! - pos.get(b.name)!);
+    return [...ordered, ...rest];
+  }
   return nodes;
 }

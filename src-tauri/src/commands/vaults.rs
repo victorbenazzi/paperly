@@ -29,6 +29,11 @@ pub async fn vault_rename(id: String, name: String, app: AppHandle) -> AppResult
 }
 
 #[tauri::command]
+pub async fn vault_set_icon(id: String, icon: Option<String>, app: AppHandle) -> AppResult<Vault> {
+    vaults::set_icon(&app, &id, icon)
+}
+
+#[tauri::command]
 pub async fn vault_set_active(id: String, app: AppHandle) -> AppResult<()> {
     vaults::set_active(&app, &id)
 }

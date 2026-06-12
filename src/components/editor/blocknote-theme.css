@@ -37,3 +37,55 @@
 .bn-editor ::selection {
   background: var(--accent-soft);
 }
+
+/*
+ * Notion-style internal page links. The decoration plugin (internalLinks.ts)
+ * wraps the link text in a span tagged data-internal-link / data-icon, nested
+ * inside the anchor; the anchor itself is styled through :has(). The ::before
+ * icon is an atomic inline box, so the underline skips it, exactly like
+ * Notion's mentions.
+ */
+.bn-editor a:has([data-internal-link]) {
+  color: inherit;
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-color: color-mix(in srgb, var(--ink) 25%, transparent);
+  border-radius: 3px;
+  /* hover wash breathes 2px past the text without shifting the line */
+  padding-inline: 2px;
+  margin-inline: -2px;
+  cursor: pointer;
+  transition: background-color var(--dur-fast, 100ms) ease;
+}
+
+.bn-editor a:has([data-internal-link]):hover {
+  background-color: var(--hover);
+  text-decoration-color: color-mix(in srgb, var(--ink) 40%, transparent);
+}
+
+/* Default page glyph: the same FileText outline the tree uses, painted with
+   a mask so it follows the theme's ink. */
+.bn-editor [data-internal-link]::before {
+  content: "";
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  margin-right: 0.25em;
+  vertical-align: -0.15em;
+  background-color: var(--ink-muted);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='black'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='M15%202H6a2%202%200%200%200-2%202v16a2%202%200%200%200%202%202h12a2%202%200%200%200%202-2V7Z'/%3E%3Cpath%20d='M14%202v4a2%202%200%200%200%202%202h4'/%3E%3Cpath%20d='M10%209H8'/%3E%3Cpath%20d='M16%2013H8'/%3E%3Cpath%20d='M16%2017H8'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%2024%2024'%20fill='none'%20stroke='black'%20stroke-width='2'%20stroke-linecap='round'%20stroke-linejoin='round'%3E%3Cpath%20d='M15%202H6a2%202%200%200%200-2%202v16a2%202%200%200%200%202%202h12a2%202%200%200%200%202-2V7Z'/%3E%3Cpath%20d='M14%202v4a2%202%200%200%200%202%202h4'/%3E%3Cpath%20d='M10%209H8'/%3E%3Cpath%20d='M16%2013H8'/%3E%3Cpath%20d='M16%2017H8'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
+/* Page with an emoji icon: show it instead of the glyph. */
+.bn-editor [data-internal-link][data-icon]::before {
+  content: attr(data-icon);
+  width: auto;
+  height: auto;
+  line-height: 1;
+  background: none;
+  -webkit-mask: none;
+  mask: none;
+}

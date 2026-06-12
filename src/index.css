@@ -1,4 +1,7 @@
 @import "tailwindcss";
+/* The example vaults are user content, not class sources; scanning them also
+   makes Tailwind rebuild (and reload the app) whenever a note is saved. */
+@source not "../examples";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/inter";

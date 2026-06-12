@@ -1,8 +1,7 @@
 import { useEditorStore } from "@/features/editor/editor.store";
-import { useNavStore } from "@/features/nav/nav.store";
 import { useTreeStore } from "@/features/tree/tree.store";
 import { stripMdExt } from "@/features/tree/tree.types";
-import { usePageMetaStore } from "./pageMeta.store";
+import { remapPagePaths } from "./pagePaths";
 
 /**
  * Rename an open page from the title or the breadcrumb. Handles the
@@ -21,13 +20,8 @@ export async function renamePage(path: string, nextName: string): Promise<string
 
   const newPath = await useTreeStore.getState().renameNode(path, companion, nextName);
 
-  useNavStore.getState().remap(path, newPath);
-  usePageMetaStore.getState().remap(path, newPath);
-  if (companion) {
-    const newDir = newPath.replace(/\.(md|markdown)$/i, "");
-    useNavStore.getState().remap(companion, newDir);
-    usePageMetaStore.getState().remap(companion, newDir);
-  }
+  remapPagePaths(path, newPath);
+  if (companion) remapPagePaths(companion, stripMdExt(newPath));
   useTreeStore.getState().select(newPath);
   return newPath;
 }

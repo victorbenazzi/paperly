@@ -1,5 +1,6 @@
 ---
 icon: ✍️
+updated: 2026-06-12T15:44:42.655Z
 ---
 
 # Content
@@ -8,8 +9,8 @@ Everything we publish that is not a campaign: blog posts, social media, the news
 
 ## Pages
 
-- [[Editorial Calendar]]: what ships when
-- Blog drafts live in the `Blog` folder, one file per post
+* [[Editorial Calendar]]: what ships when
+* Blog drafts live in the `Blog` folder, one file per post
 
 ## Workflow
 

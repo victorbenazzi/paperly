@@ -48,6 +48,9 @@ interface EditorState {
   /** Adopt `diskContent` (an external edit) as the new saved state. */
   reloadFromDisk: (path: string, diskContent: string) => Promise<void>;
   close: () => Promise<void>;
+  /** Drop the open note WITHOUT flushing: its file is going away, and a
+      pending autosave would resurrect it on disk. */
+  discard: () => void;
   /** The open note moved on disk (rename/drag); follow without reloading. */
   remap: (path: string) => void;
 }
@@ -100,23 +103,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   registerReloader: (fn) => set({ reloader: fn }),
 
-  reloadFromDisk: async (path, diskContent) => {
-    const { path: openPath, reloader, saveTimer } = get();
-    if (openPath !== path || !reloader) return;
-    if (saveTimer !== null) {
-      window.clearTimeout(saveTimer);
-      set({ saveTimer: null });
-    }
-    const { meta, body } = splitFrontmatter(diskContent);
-    await reloader(body);
-    set({
-      meta,
-      metaDirty: false,
-      lastSavedBody: body,
-      lastSavedContent: diskContent,
-      status: "idle",
-    });
-  },
+  reloadFromDisk: (path, diskContent) =>
+    // Joins the save queue: a flush already serializing would otherwise
+    // capture a pre-reload snapshot and write it back over the disk version.
+    enqueue(async () => {
+      const { path: openPath, reloader, saveTimer } = get();
+      if (openPath !== path || !reloader) return;
+      if (saveTimer !== null) {
+        window.clearTimeout(saveTimer);
+        set({ saveTimer: null });
+      }
+      const { meta, body } = splitFrontmatter(diskContent);
+      await reloader(body);
+      set({
+        meta,
+        metaDirty: false,
+        lastSavedBody: body,
+        lastSavedContent: diskContent,
+        status: "idle",
+      });
+    }),
 
   scheduleSave: () => {
     const { saveTimer } = get();
@@ -127,50 +133,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ status: "dirty", saveTimer: timer });
   },
 
-  saveNow: async () => {
-    const { path, serializer, saveTimer, meta, lastSavedBody } = get();
-    if (saveTimer !== null) {
-      window.clearTimeout(saveTimer);
-      set({ saveTimer: null });
-    }
-    if (!path || !serializer) return;
-
-    let body: string;
-    try {
-      body = await serializer();
-    } catch {
-      return; // editor mid-teardown; nothing reliable to save
-    }
-    if (body === lastSavedBody && !get().metaDirty) {
-      if (get().status === "dirty") set({ status: "saved" });
-      return;
-    }
-
-    // Only touch `updated` when the file already carries frontmatter:
-    // Paperly never introduces frontmatter into a plain markdown file.
-    const hasMeta = Object.keys(meta).length > 0;
-    const nextMeta: NoteMeta = hasMeta
-      ? { ...meta, updated: new Date().toISOString() }
-      : meta;
-    const content = joinFrontmatter(nextMeta, body);
-
-    set({ status: "saving" });
-    try {
-      await ipc(CMD.writeFileText, { path, content });
-      set({
-        status: "saved",
-        meta: nextMeta,
-        metaDirty: false,
-        lastSavedBody: body,
-        lastSavedContent: content,
-      });
-    } catch (err) {
-      set({ status: "error", error: errorMessage(err) });
-    }
-  },
+  // Queued, never concurrent: switching notes fires a flush from the old
+  // editor's close() AND from the new editor's load(); run in parallel they
+  // both pass the "body changed?" check and write twice.
+  saveNow: () => enqueue(doSave),
 
   close: async () => {
+    const closing = get().path;
     await get().saveNow();
+    // While the flush was in flight a newer note may have loaded; the store
+    // now belongs to it, so this close must not wipe its state.
+    if (get().path !== closing) return;
+    get().discard();
+  },
+
+  discard: () => {
+    const { saveTimer } = get();
+    if (saveTimer !== null) window.clearTimeout(saveTimer);
     set({
       path: null,
       status: "idle",
@@ -181,11 +160,69 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       lastSavedContent: null,
       serializer: null,
       reloader: null,
+      saveTimer: null,
     });
   },
 
   remap: (path) => set({ path }),
 }));
+
+let saveChain: Promise<void> = Promise.resolve();
+
+/** Serialize every disk-facing editor task; they race each other otherwise. */
+function enqueue(task: () => Promise<void>): Promise<void> {
+  const next = saveChain.then(task);
+  saveChain = next.catch(() => {});
+  return next;
+}
+
+async function doSave(): Promise<void> {
+  const get = useEditorStore.getState;
+  const set = useEditorStore.setState;
+
+  const { path, serializer, saveTimer, meta, lastSavedBody } = get();
+  if (saveTimer !== null) {
+    window.clearTimeout(saveTimer);
+    set({ saveTimer: null });
+  }
+  if (!path || !serializer) return;
+
+  let body: string;
+  try {
+    body = await serializer();
+  } catch {
+    return; // editor mid-teardown; nothing reliable to save
+  }
+  // The note may have been discarded (deleted) or remapped while the
+  // serializer ran; writing through the captured path would recreate it.
+  if (get().path !== path) return;
+  if (body === lastSavedBody && !get().metaDirty) {
+    if (get().status === "dirty") set({ status: "saved" });
+    return;
+  }
+
+  // Only touch `updated` when the file already carries frontmatter:
+  // Paperly never introduces frontmatter into a plain markdown file.
+  const hasMeta = Object.keys(meta).length > 0;
+  const nextMeta: NoteMeta = hasMeta
+    ? { ...meta, updated: new Date().toISOString() }
+    : meta;
+  const content = joinFrontmatter(nextMeta, body);
+
+  set({ status: "saving" });
+  try {
+    await ipc(CMD.writeFileText, { path, content });
+    set({
+      status: "saved",
+      meta: nextMeta,
+      metaDirty: false,
+      lastSavedBody: body,
+      lastSavedContent: content,
+    });
+  } catch (err) {
+    set({ status: "error", error: errorMessage(err) });
+  }
+}
 
 /** Flush on window blur and before quit. Call once at startup. */
 export function initEditorFlushListeners() {

@@ -1,5 +1,6 @@
 ---
 icon: 🗣️
+updated: 2026-06-12T16:48:21.645Z
 ---
 
 # Voz e Tom
@@ -15,14 +16,14 @@ A Paperly soa como uma amiga calma que por acaso é muito organizada.
 
 ## Faça e não faça
 
-| Faça | Não faça |
-| --- | --- |
-| "Suas notas vivem numa pasta que é sua." | "Sistema operacional de conhecimento revolucionário com IA!!!" |
-| "Nada sai do seu Mac." | "Soluções de segurança nível enterprise." |
-| "Aponte a Paperly para uma pasta que você já tem." | "Migre seu workspace para a nossa plataforma." |
+| Faça                                               | Não faça                                                       |
+| -------------------------------------------------- | -------------------------------------------------------------- |
+| "Suas notas vivem numa pasta que é sua."           | "Sistema operacional de conhecimento revolucionário com IA!!!" |
+| "Nada sai do seu Mac."                             | "Soluções de segurança nível enterprise."                      |
+| "Aponte a Paperly para uma pasta que você já tem." | "Migre seu workspace para a nossa plataforma."                 |
 
 ## Palavras que evitamos
 
-- "Solução", "plataforma", "ecossistema" para falar do app
-- "Usuários" em copy pública (diga "pessoas" ou "você")
-- Qualquer travessão. Vírgulas, dois-pontos ou parênteses no lugar.
+* "Solução", "plataforma", "ecossistema" para falar do app
+* "Usuários" em copy pública (diga "pessoas" ou "você")
+* Qualquer travessão. Vírgulas, dois-pontos ou parênteses no lugar.

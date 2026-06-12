@@ -1,5 +1,6 @@
 ---
 icon: 🎨
+updated: 2026-06-12T16:48:10.335Z
 ---
 
 # Marca
@@ -8,8 +9,8 @@ A fonte da verdade sobre como a Paperly aparece e soa. Se uma copy ou decisão d
 
 ## Páginas
 
-- [[Diretrizes da Marca]]: regras de logo, cor e tipografia
-- [[Voz e Tom]]: como escrevemos, em todo lugar
+* [[Diretrizes da Marca]]: regras de logo, cor e tipografia
+* [[Voz e Tom]]: como escrevemos, em todo lugar
 
 ## Regras de ouro
 
