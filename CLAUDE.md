@@ -5,6 +5,8 @@
 - **Paperly**: app de notas Markdown local-first (Tauri 2 + React 19 + BlockNote). A pasta local chama `noteflow`, mas o produto e o repo são Paperly: `victorbenazzi/paperly` (GitHub, público).
 - Gerenciador: pnpm. `pnpm tauri dev` roda o app; `pnpm dev` sozinho roda só a UI no navegador usando o mock de IPC (`src/lib/ipc.mock.ts`).
 - i18n en + pt-BR em `src/features/i18n/locales/`; toda string nova entra nos dois arquivos.
+- `docs/` é a landing page (HTML puro) servida pelo GitHub Pages (main, pasta `/docs`). Os botões de download resolvem a release mais nova via API do GitHub em runtime, com fallback para a página de releases.
+- Copy/marketing: NÃO prometer "sem sync". Sync opcional está no roadmap (estilo Obsidian). Usar "sem conta, sem lock-in, nada sai da sua máquina sem você decidir".
 
 ## Releases e auto-update
 

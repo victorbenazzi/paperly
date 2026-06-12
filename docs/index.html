@@ -1,0 +1,526 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Paperly · Suas notas, em arquivos que são seus</title>
+  <meta name="description" content="Paperly é um app de notas Markdown local-first para Mac, Windows e Linux. Suas notas vivem em pastas suas: sem conta, sem lock-in, nada sai da sua máquina sem você decidir. Grátis e open source." />
+  <link rel="icon" type="image/png" href="assets/favicon.png" />
+  <meta property="og:title" content="Paperly · Notas Markdown locais" />
+  <meta property="og:description" content="Suas notas em arquivos Markdown que são seus. Sem conta, sem lock-in, local-first." />
+  <meta property="og:image" content="https://victorbenazzi.github.io/paperly/assets/logo-azul.png" />
+  <meta property="og:type" content="website" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,400;6..72,500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --paper: #fbfaf7;
+      --surface: #ffffff;
+      --ink: #16181d;
+      --ink-secondary: #4b4f58;
+      --ink-muted: #84878f;
+      --hairline: #e8e6df;
+      --blue: #1866f4;
+      --blue-active: #1257d6;
+      --blue-soft: #eef4fe;
+      --radius: 9px;
+      --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --serif: "Newsreader", Georgia, "Times New Roman", serif;
+      --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, monospace;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { font-size: 14px; }
+
+    body {
+      font-family: var(--sans);
+      font-size: 1rem;
+      line-height: 1.6;
+      color: var(--ink);
+      background: var(--paper);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    ::selection { background: var(--blue-soft); }
+
+    a { color: inherit; }
+
+    .wrap {
+      width: min(100% - 3rem, 60rem);
+      margin-inline: auto;
+    }
+
+    /* ── Header ─────────────────────────────────────────── */
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: color-mix(in srgb, var(--paper) 86%, transparent);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-bottom: 1px solid color-mix(in srgb, var(--hairline) 70%, transparent);
+    }
+
+    .header-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 3.75rem;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+      text-decoration: none;
+      font-weight: 600;
+      letter-spacing: -0.01em;
+      font-size: 1.07rem;
+    }
+
+    .brand img { width: 1.5rem; height: auto; display: block; }
+
+    .gh-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: .45rem;
+      height: 2.15rem;
+      padding: 0 .85rem;
+      border: 1px solid var(--hairline);
+      border-radius: 999px;
+      background: var(--surface);
+      text-decoration: none;
+      font-size: .93rem;
+      font-weight: 500;
+      color: var(--ink-secondary);
+      transition: border-color .15s ease, color .15s ease, transform .15s ease;
+    }
+
+    .gh-btn:hover { border-color: #d4d1c8; color: var(--ink); }
+    .gh-btn:active { transform: scale(.98); }
+    .gh-btn svg { width: 1.05rem; height: 1.05rem; }
+
+    /* ── Hero ───────────────────────────────────────────── */
+    .hero {
+      position: relative;
+      padding: 7.5rem 0 6.5rem;
+      text-align: center;
+      overflow: hidden;
+    }
+
+    /* faint paper wash behind the mark */
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(34rem 22rem at 50% 12%, color-mix(in srgb, var(--blue) 6%, transparent), transparent 70%);
+      pointer-events: none;
+    }
+
+    .hero > .wrap { position: relative; }
+
+    .hero-logo {
+      width: 4.6rem;
+      height: auto;
+      margin-bottom: 2.1rem;
+      filter: drop-shadow(0 10px 24px rgba(24, 102, 244, .16));
+    }
+
+    h1 {
+      font-family: var(--serif);
+      font-weight: 500;
+      /* scales with the viewport so the whole sentence stays on ONE line on
+         desktop; below 720px the media query lets it wrap again */
+      font-size: clamp(2.3rem, 4.4vw, 3.1rem);
+      line-height: 1.12;
+      letter-spacing: -0.015em;
+      white-space: nowrap;
+      margin-inline: auto;
+    }
+
+    h1 em {
+      font-style: italic;
+      color: var(--blue);
+    }
+
+    .hero h2 {
+      font-weight: 400;
+      font-size: 1.14rem;
+      line-height: 1.65;
+      color: var(--ink-secondary);
+      max-width: 46ch;
+      margin: 1.35rem auto 0;
+      text-wrap: pretty;
+    }
+
+    .nb { white-space: nowrap; }
+
+    /* ── Download buttons ───────────────────────────────── */
+    .dl-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: .6rem;
+      margin-top: 2.6rem;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: .5rem;
+      height: 2.45rem;
+      padding: 0 1.1rem;
+      border-radius: var(--radius);
+      font-size: .965rem;
+      font-weight: 500;
+      letter-spacing: .005em;
+      text-decoration: none;
+      transition: background .15s ease, border-color .15s ease, transform .15s ease, box-shadow .15s ease;
+    }
+
+    .btn:active { transform: translateY(1px); }
+    .btn svg { width: 1rem; height: 1rem; flex: none; }
+
+    .btn-primary {
+      background: var(--blue);
+      color: #fff;
+      box-shadow: 0 1px 2px rgba(24, 102, 244, .35), inset 0 1px 0 rgba(255, 255, 255, .18);
+    }
+    .btn-primary:hover { background: var(--blue-active); }
+
+    .btn-ghost {
+      background: var(--surface);
+      border: 1px solid var(--hairline);
+      color: var(--ink-secondary);
+    }
+    .btn-ghost:hover { border-color: #d4d1c8; color: var(--ink); }
+
+    .dl-meta {
+      margin-top: 1.15rem;
+      font-size: .9rem;
+      color: var(--ink-muted);
+    }
+
+    .dl-meta a {
+      color: var(--ink-muted);
+      text-underline-offset: 3px;
+      text-decoration-color: var(--hairline);
+      transition: color .15s ease;
+    }
+    .dl-meta a:hover { color: var(--ink); }
+
+    /* ── Install guide ──────────────────────────────────── */
+    .guide {
+      border-top: 1px solid var(--hairline);
+      padding: 4.5rem 0 4rem;
+    }
+
+    .guide-grid {
+      display: grid;
+      grid-template-columns: 1fr 1.6fr;
+      gap: 3rem;
+    }
+
+    @media (max-width: 720px) {
+      .guide-grid { grid-template-columns: 1fr; gap: 1.8rem; }
+      .hero { padding: 5rem 0 4.5rem; }
+      h1 {
+        white-space: normal;
+        text-wrap: balance;
+        line-height: 1.08;
+      }
+    }
+
+    .guide-title h3 {
+      font-family: var(--serif);
+      font-weight: 500;
+      font-size: 1.9rem;
+      letter-spacing: -0.01em;
+      line-height: 1.15;
+    }
+
+    .guide-title p {
+      margin-top: .7rem;
+      color: var(--ink-muted);
+      font-size: .95rem;
+      max-width: 30ch;
+    }
+
+    ol.steps {
+      list-style: none;
+      counter-reset: step;
+      display: flex;
+      flex-direction: column;
+      gap: 1.6rem;
+    }
+
+    ol.steps > li {
+      counter-increment: step;
+      position: relative;
+      padding-left: 2.7rem;
+      font-size: .985rem;
+      color: var(--ink-secondary);
+    }
+
+    ol.steps > li::before {
+      content: counter(step);
+      position: absolute;
+      left: 0;
+      top: .05rem;
+      width: 1.75rem;
+      height: 1.75rem;
+      display: grid;
+      place-items: center;
+      border: 1px solid var(--hairline);
+      border-radius: 999px;
+      background: var(--surface);
+      font-size: .82rem;
+      font-weight: 600;
+      color: var(--ink);
+    }
+
+    ol.steps strong { color: var(--ink); font-weight: 600; }
+
+    .kbd {
+      font-family: var(--mono);
+      font-size: .85em;
+      background: var(--surface);
+      border: 1px solid var(--hairline);
+      border-bottom-width: 2px;
+      border-radius: 5px;
+      padding: .08em .4em;
+      color: var(--ink);
+      white-space: nowrap;
+    }
+
+    .terminal {
+      margin-top: .85rem;
+      display: flex;
+      align-items: center;
+      gap: .75rem;
+      background: #15171c;
+      color: #e8eaf0;
+      border-radius: var(--radius);
+      padding: .8rem .9rem .8rem 1rem;
+      font-family: var(--mono);
+      font-size: .92rem;
+      overflow-x: auto;
+    }
+
+    .terminal code { flex: 1; white-space: nowrap; }
+    .terminal .dollar { color: #6b7280; user-select: none; }
+
+    .copy-btn {
+      flex: none;
+      font-family: var(--sans);
+      font-size: .82rem;
+      font-weight: 500;
+      color: #c8ccd6;
+      background: #23262e;
+      border: 1px solid #32363f;
+      border-radius: 6px;
+      padding: .32rem .7rem;
+      cursor: pointer;
+      transition: background .15s ease, color .15s ease;
+    }
+    .copy-btn:hover { background: #2b2f38; color: #fff; }
+    .copy-btn.done { color: #7ee2a8; border-color: #2e4a3a; }
+
+    .why {
+      margin-top: .95rem;
+      background: var(--blue-soft);
+      border: 1px solid color-mix(in srgb, var(--blue) 18%, transparent);
+      border-radius: var(--radius);
+      padding: 1rem 1.15rem;
+      font-size: .93rem;
+      color: var(--ink-secondary);
+    }
+
+    .why strong { color: var(--ink); font-weight: 600; }
+    .why p + p { margin-top: .6rem; }
+
+    .win-note {
+      margin-top: 2.2rem;
+      padding-top: 1.4rem;
+      border-top: 1px dashed var(--hairline);
+      font-size: .9rem;
+      color: var(--ink-muted);
+    }
+
+    /* ── Footer ─────────────────────────────────────────── */
+    footer {
+      border-top: 1px solid var(--hairline);
+      padding: 1.9rem 0 2.2rem;
+      font-size: .88rem;
+      color: var(--ink-muted);
+    }
+
+    footer .wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: .5rem 1.5rem;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    footer a {
+      color: var(--ink-muted);
+      text-underline-offset: 3px;
+      text-decoration-color: var(--hairline);
+    }
+    footer a:hover { color: var(--ink); }
+
+    /* ── Entrance motion ────────────────────────────────── */
+    @media (prefers-reduced-motion: no-preference) {
+      .rise {
+        opacity: 0;
+        transform: translateY(14px);
+        animation: rise .7s cubic-bezier(.22, .8, .3, 1) forwards;
+      }
+      .rise:nth-child(1) { animation-delay: .05s; }
+      .rise:nth-child(2) { animation-delay: .14s; }
+      .rise:nth-child(3) { animation-delay: .23s; }
+      .rise:nth-child(4) { animation-delay: .32s; }
+      .rise:nth-child(5) { animation-delay: .41s; }
+      @keyframes rise {
+        to { opacity: 1; transform: none; }
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="wrap header-inner">
+      <a class="brand" href="#">
+        <img src="assets/logo-preta.svg" alt="" width="24" height="23" />
+        Paperly
+      </a>
+      <a class="gh-btn" href="https://github.com/victorbenazzi/paperly" target="_blank" rel="noopener">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/></svg>
+        GitHub
+      </a>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="wrap">
+        <img class="hero-logo rise" src="assets/logo-azul.svg" alt="Paperly" width="74" height="70" />
+        <h1 class="rise">Suas notas, em arquivos que são <em>seus</em>.</h1>
+        <h2 class="rise">Paperly é um app de notas Markdown <span class="nb">local-first</span>. Tudo vive em pastas no seu computador: sem conta, sem <span class="nb">lock-in</span>, e nada sai da sua máquina sem você decidir. Grátis e <span class="nb">open source</span>.</h2>
+
+        <div class="dl-row rise">
+          <a class="btn btn-primary" id="dl-arm" href="https://github.com/victorbenazzi/paperly/releases/latest">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.36 12.78c.02 2.55 2.23 3.4 2.26 3.41-.02.06-.35 1.21-1.17 2.4-.7 1.03-1.43 2.05-2.58 2.07-1.13.02-1.5-.67-2.79-.67-1.3 0-1.7.65-2.77.69-1.11.04-1.95-1.11-2.66-2.13-1.45-2.1-2.56-5.92-1.07-8.5.74-1.28 2.06-2.1 3.49-2.12 1.09-.02 2.12.74 2.79.74.66 0 1.91-.91 3.23-.78.55.02 2.09.22 3.08 1.68-.08.05-1.84 1.08-1.81 3.21M14.4 5.59c.59-.71.98-1.7.88-2.69-.85.03-1.87.56-2.48 1.27-.54.63-1.02 1.64-.89 2.6.94.07 1.91-.48 2.49-1.18"/></svg>
+            Baixar para Mac
+          </a>
+          <a class="btn btn-ghost" id="dl-intel" href="https://github.com/victorbenazzi/paperly/releases/latest">Mac Intel</a>
+          <a class="btn btn-ghost" id="dl-win" href="https://github.com/victorbenazzi/paperly/releases/latest">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.55 10.5 4.5v7H3v-5.95ZM3 18.45V12.5h7.5v7L3 18.45ZM11.5 4.35 21 3v8.5h-9.5v-7.15ZM21 21l-9.5-1.35V12.5H21V21Z"/></svg>
+            Windows
+          </a>
+        </div>
+
+        <p class="dl-meta rise">
+          <span id="version">v0.1.0</span> ·
+          Mac com chip Apple (2020+); Intel à parte ·
+          Linux: <a id="dl-deb" href="https://github.com/victorbenazzi/paperly/releases/latest">.deb</a> /
+          <a id="dl-rpm" href="https://github.com/victorbenazzi/paperly/releases/latest">.rpm</a> ·
+          <a href="https://github.com/victorbenazzi/paperly/releases" target="_blank" rel="noopener">todas as versões</a>
+        </p>
+      </div>
+    </section>
+
+    <section class="guide">
+      <div class="wrap guide-grid">
+        <div class="guide-title">
+          <h3>Como instalar no&nbsp;Mac</h3>
+          <p>Quatro passos, menos de dois minutos. Só na primeira vez: as atualizações seguintes chegam pelo próprio app.</p>
+        </div>
+
+        <ol class="steps">
+          <li>
+            <strong>Baixe o Paperly.</strong> Mac de 2020 em diante (chip M1, M2, M3...) usa o botão <strong>Baixar para Mac</strong>. Macs mais antigos, com processador Intel, usam <strong>Mac Intel</strong>.
+          </li>
+          <li>
+            <strong>Instale.</strong> Abra o arquivo <span class="kbd">.dmg</span> baixado e arraste o Paperly para a pasta <strong>Aplicativos</strong>.
+          </li>
+          <li>
+            <strong>Libere o app no Terminal.</strong> Aperte <span class="kbd">⌘ Cmd</span> + <span class="kbd">Espaço</span>, digite <em>Terminal</em>, dê Enter. Cole o comando abaixo e aperte Enter. Ele pede a senha do seu Mac e, ao digitar, nada aparece na tela; é normal, digite e confirme.
+            <div class="terminal">
+              <span class="dollar">$</span>
+              <code id="cmd">sudo xattr -cr /Applications/Paperly.app</code>
+              <button class="copy-btn" id="copy" type="button">Copiar</button>
+            </div>
+            <div class="why">
+              <p><strong>Por que esse comando?</strong> Todo app baixado da internet ganha do macOS uma marca de “quarentena”. Apps só escapam do aviso de “desenvolvedor não identificado” quando o criador paga o selo de notarização da Apple, US$&nbsp;99 por ano. O Paperly é gratuito e ainda não paga esse selo, então o macOS bloquearia a abertura.</p>
+              <p>O comando faz uma única coisa: remove a marca de quarentena <em>deste</em> app, dizendo ao sistema que você confia nele. Nenhuma proteção do macOS é desativada para o resto da máquina. E como o Paperly é open source, o código que roda aí é público e auditável no GitHub.</p>
+            </div>
+          </li>
+          <li>
+            <strong>Pronto.</strong> Abra o Paperly normalmente. Quando sair uma versão nova, uma pílula azul aparece no topo do app: um clique baixa, instala e reabre sozinho.
+          </li>
+        </ol>
+      </div>
+      <div class="wrap">
+        <p class="win-note">
+          <strong>No Windows:</strong> na primeira execução o SmartScreen pode mostrar “O Windows protegeu o computador”. Clique em <em>Mais informações</em> e depois <em>Executar assim mesmo</em>; acontece só uma vez, pelo mesmo motivo acima (builds ainda não assinados).
+        </p>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>© 2026 Paperly · Notas locais em Markdown</span>
+      <span>
+        <a href="https://github.com/victorbenazzi/paperly" target="_blank" rel="noopener">Código no GitHub</a> ·
+        <a href="https://github.com/victorbenazzi/paperly/releases" target="_blank" rel="noopener">Releases</a>
+      </span>
+    </div>
+  </footer>
+
+  <script>
+    // Resolve direct download links for the newest release. Fallback (the
+    // static hrefs) is the releases page, so the page works even if the
+    // GitHub API is rate-limited.
+    fetch("https://api.github.com/repos/victorbenazzi/paperly/releases/latest")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((rel) => {
+        if (!rel || !rel.assets) return;
+        const targets = {
+          "dl-arm": (n) => n.endsWith("_aarch64.dmg"),
+          "dl-intel": (n) => n.endsWith("_x64.dmg"),
+          "dl-win": (n) => n.endsWith("_x64-setup.exe"),
+          "dl-deb": (n) => n.endsWith("_amd64.deb"),
+          "dl-rpm": (n) => n.endsWith(".x86_64.rpm"),
+        };
+        for (const [id, match] of Object.entries(targets)) {
+          const asset = rel.assets.find((a) => match(a.name));
+          const el = document.getElementById(id);
+          if (asset && el) el.href = asset.browser_download_url;
+        }
+        if (rel.tag_name) document.getElementById("version").textContent = rel.tag_name;
+      })
+      .catch(() => {});
+
+    const copyBtn = document.getElementById("copy");
+    copyBtn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(document.getElementById("cmd").textContent);
+        copyBtn.textContent = "Copiado!";
+        copyBtn.classList.add("done");
+        setTimeout(() => {
+          copyBtn.textContent = "Copiar";
+          copyBtn.classList.remove("done");
+        }, 1800);
+      } catch {}
+    });
+  </script>
+</body>
+</html>

@@ -1,6 +1,6 @@
 # Paperly
 
-Local-first Markdown notes. Your notes live as plain `.md` files in folders you own (vaults): no accounts, no sync, no lock-in.
+Local-first Markdown notes. Your notes live as plain `.md` files in folders you own (vaults): no accounts, no lock-in, and nothing leaves your machine unless you decide.
 
 Built with Tauri 2, React 19 and BlockNote.
 
