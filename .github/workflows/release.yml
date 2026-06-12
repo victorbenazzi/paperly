@@ -133,6 +133,16 @@ jobs:
           echo "Valid code-signing identities:"
           security find-identity -v -p codesigning "$KEYCHAIN"
 
+      # Asset names embed the bare version (no leading "v"), so the release
+      # body can only link to them if we strip it off the tag here.
+      - name: Compute release meta
+        id: meta
+        shell: bash
+        run: |
+          TAG="${{ github.event.inputs.tag || github.ref_name }}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+
       - name: Build & publish to GitHub Release
         uses: tauri-apps/tauri-action@v0
         env:
@@ -142,16 +152,24 @@ jobs:
           # Empty when the secret is absent => tauri-action falls back to ad-hoc.
           APPLE_SIGNING_IDENTITY: ${{ env.SIGN == 'true' && 'paperly self-signed' || '' }}
         with:
-          tagName: ${{ github.event.inputs.tag || github.ref_name }}
-          releaseName: "Paperly ${{ github.event.inputs.tag || github.ref_name }}"
+          tagName: ${{ steps.meta.outputs.tag }}
+          releaseName: "Paperly ${{ steps.meta.outputs.tag }}"
           releaseBody: |
-            ## Paperly ${{ github.event.inputs.tag || github.ref_name }}
+            ## Paperly ${{ steps.meta.outputs.tag }}
 
             ### Download
-            - **macOS Apple Silicon (M1/M2/M3/M4)** → `Paperly_*_aarch64.dmg`
-            - **macOS Intel** → `Paperly_*_x64.dmg`
-            - **Windows x64** → `Paperly_*_x64-setup.exe` (NSIS) or `Paperly_*_x64_en-US.msi` (WiX)
-            - **Linux x64** → `Paperly_*_amd64.deb` or `Paperly-*.x86_64.rpm`
+
+            | Platform | Download |
+            | --- | --- |
+            | **macOS Apple Silicon** (M1 or newer, Macs from 2020+) | [`Paperly_${{ steps.meta.outputs.version }}_aarch64.dmg`](https://github.com/victorbenazzi/paperly/releases/download/${{ steps.meta.outputs.tag }}/Paperly_${{ steps.meta.outputs.version }}_aarch64.dmg) |
+            | **macOS Intel** | [`Paperly_${{ steps.meta.outputs.version }}_x64.dmg`](https://github.com/victorbenazzi/paperly/releases/download/${{ steps.meta.outputs.tag }}/Paperly_${{ steps.meta.outputs.version }}_x64.dmg) |
+            | **Windows** | [`Paperly_${{ steps.meta.outputs.version }}_x64-setup.exe`](https://github.com/victorbenazzi/paperly/releases/download/${{ steps.meta.outputs.tag }}/Paperly_${{ steps.meta.outputs.version }}_x64-setup.exe) |
+            | **Linux** (Debian/Ubuntu) | [`Paperly_${{ steps.meta.outputs.version }}_amd64.deb`](https://github.com/victorbenazzi/paperly/releases/download/${{ steps.meta.outputs.tag }}/Paperly_${{ steps.meta.outputs.version }}_amd64.deb) |
+            | **Linux** (Fedora/RHEL) | [`Paperly-${{ steps.meta.outputs.version }}-1.x86_64.rpm`](https://github.com/victorbenazzi/paperly/releases/download/${{ steps.meta.outputs.tag }}/Paperly-${{ steps.meta.outputs.version }}-1.x86_64.rpm) |
+
+            Prefer an MSI on Windows? [`Paperly_${{ steps.meta.outputs.version }}_x64_en-US.msi`](https://github.com/victorbenazzi/paperly/releases/download/${{ steps.meta.outputs.tag }}/Paperly_${{ steps.meta.outputs.version }}_x64_en-US.msi) is also available.
+
+            All the other files in the assets list (`.sig`, `.app.tar.gz`, `latest.json`, source archives) belong to the auto-updater. End users can ignore them.
 
             ### Auto-update
             Already running a previous version? Paperly checks for this release on launch and shows a blue **Update** pill in the title bar. One click: download, install, relaunch. No reinstall.

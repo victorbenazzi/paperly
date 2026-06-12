@@ -6,12 +6,17 @@ Built with Tauri 2, React 19 and BlockNote.
 
 ## Install
 
-Grab the installer for your platform from the [latest release](https://github.com/victorbenazzi/paperly/releases/latest):
+Open the [latest release](https://github.com/victorbenazzi/paperly/releases/latest): the direct download links are in the table at the top of the release notes. Pick by platform:
 
-- **macOS Apple Silicon** → `Paperly_*_aarch64.dmg`
-- **macOS Intel** → `Paperly_*_x64.dmg`
-- **Windows x64** → `Paperly_*_x64-setup.exe` or `Paperly_*_x64_en-US.msi`
-- **Linux x64** → `Paperly_*_amd64.deb` or `Paperly-*.x86_64.rpm`
+| Platform | File to download |
+| --- | --- |
+| macOS Apple Silicon (M1 or newer, Macs from 2020+) | `Paperly_<version>_aarch64.dmg` |
+| macOS Intel | `Paperly_<version>_x64.dmg` |
+| Windows | `Paperly_<version>_x64-setup.exe` |
+| Linux (Debian/Ubuntu) | `Paperly_<version>_amd64.deb` |
+| Linux (Fedora/RHEL) | `Paperly-<version>-1.x86_64.rpm` |
+
+Everything else in the assets list (`.sig`, `.app.tar.gz`, `latest.json`, source archives) belongs to the auto-updater; ignore it.
 
 macOS builds are signed with a stable self-signed certificate (not notarized). After dragging Paperly into `/Applications`, run once:
 
