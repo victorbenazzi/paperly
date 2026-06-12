@@ -18,7 +18,14 @@ export function UpdatePill() {
   const { t } = useTranslation();
   const status = useUpdatesStore((s) => s.status);
 
-  if (status.kind === "idle" || status.kind === "checking") return null;
+  if (
+    status.kind === "idle" ||
+    status.kind === "checking" ||
+    status.kind === "upToDate" ||
+    status.kind === "checkError"
+  ) {
+    return null;
+  }
 
   const isError = status.kind === "error";
   const isBusy = status.kind === "downloading" || status.kind === "installing";

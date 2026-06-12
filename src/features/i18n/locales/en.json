@@ -79,7 +79,8 @@
     "themeSystem": "System",
     "themeLight": "Light",
     "themeDark": "Dark",
-    "language": "Language"
+    "language": "Language",
+    "updates": "Updates"
   },
   "updates": {
     "pill": {
@@ -88,6 +89,13 @@
       "downloadingIndeterminate": "Downloading...",
       "installing": "Restarting...",
       "error": "Update failed. Retry"
+    },
+    "check": {
+      "action": "Check for updates",
+      "checking": "Checking...",
+      "upToDate": "Up to date",
+      "failed": "Check failed. Retry",
+      "install": "Update to v{{version}}"
     }
   },
   "errors": {

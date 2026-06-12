@@ -14,7 +14,15 @@ let cachedUpdate: Update | null = null;
 export async function checkSilent(): Promise<void> {
   if (import.meta.env.DEV) return;
   const store = useUpdatesStore.getState();
-  if (store.status.kind !== "idle" && store.status.kind !== "error") return;
+  const kind = store.status.kind;
+  // Never stomp an in-flight check/install or an already-offered update.
+  if (
+    kind === "checking" ||
+    kind === "available" ||
+    kind === "downloading" ||
+    kind === "installing"
+  )
+    return;
 
   store.setStatus({ kind: "checking" });
   try {
@@ -33,6 +41,51 @@ export async function checkSilent(): Promise<void> {
   } catch {
     store.setStatus({ kind: "idle" });
     cachedUpdate = null;
+  }
+}
+
+/**
+ * Explicit "Check for updates" from Settings. Unlike checkSilent, every
+ * outcome is surfaced: "upToDate" and "checkError" exist only for this flow
+ * (the pill hides both; the Settings row renders them). The DEV guard stays
+ * because in dev there is no installed bundle to diff against, and a real
+ * check could offer (and install) a release over the dev build.
+ */
+export async function checkManual(): Promise<void> {
+  const store = useUpdatesStore.getState();
+  const kind = store.status.kind;
+  if (kind === "checking" || kind === "downloading" || kind === "installing") {
+    return;
+  }
+
+  if (import.meta.env.DEV) {
+    store.setStatus({
+      kind: "checkError",
+      message: "updater is disabled in dev builds",
+    });
+    return;
+  }
+
+  store.setStatus({ kind: "checking" });
+  try {
+    const update = await check();
+    if (!update) {
+      cachedUpdate = null;
+      useUpdatesStore.getState().setStatus({ kind: "upToDate" });
+      return;
+    }
+    cachedUpdate = update;
+    useUpdatesStore.getState().setStatus({
+      kind: "available",
+      version: update.version,
+      notes: update.body,
+    });
+  } catch (err) {
+    cachedUpdate = null;
+    useUpdatesStore.getState().setStatus({
+      kind: "checkError",
+      message: err instanceof Error ? err.message : String(err),
+    });
   }
 }
 

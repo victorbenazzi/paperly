@@ -3,6 +3,10 @@ import { create } from "zustand";
 export type UpdateStatus =
   | { kind: "idle" }
   | { kind: "checking" }
+  // Outcomes that only the manual check (Settings) surfaces; the silent boot
+  // check collapses both into "idle" and the pill ignores them.
+  | { kind: "upToDate" }
+  | { kind: "checkError"; message: string }
   | { kind: "available"; version: string; notes?: string }
   | {
       kind: "downloading";

@@ -1,8 +1,23 @@
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, ChevronDown, Languages, Moon, Sun, SunMoon } from "lucide-react";
+import { getVersion } from "@tauri-apps/api/app";
+import {
+  Check,
+  ChevronDown,
+  Download,
+  Languages,
+  Loader2,
+  Moon,
+  RefreshCw,
+  Sun,
+  SunMoon,
+} from "lucide-react";
 
+import { cn } from "@/lib/utils";
 import { useUiStore } from "@/features/ui/ui.store";
 import { useThemeStore, type ThemeMode } from "@/features/theme/theme.store";
+import { useUpdatesStore } from "@/features/updates/updates.store";
+import { checkManual, startInstall } from "@/features/updates/updates.service";
 import { SUPPORTED_LANGUAGES } from "@/features/i18n/config";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -45,6 +60,81 @@ function SettingRow({
   );
 }
 
+/**
+ * Manual update check, the explicit counterpart to the silent boot probe.
+ * One button whose label tracks the shared updates store, so a check started
+ * here and the title-bar pill never disagree about what is happening.
+ */
+function UpdatesControl() {
+  const { t } = useTranslation();
+  const status = useUpdatesStore((s) => s.status);
+
+  let label: string;
+  let Icon = RefreshCw;
+  let spinning = false;
+  let onClick: (() => void) | null = () => void checkManual();
+  let tone: "default" | "accent" | "warning" = "default";
+
+  if (status.kind === "checking") {
+    label = t("updates.check.checking");
+    Icon = Loader2;
+    spinning = true;
+    onClick = null;
+  } else if (status.kind === "upToDate") {
+    label = t("updates.check.upToDate");
+    Icon = Check;
+  } else if (status.kind === "checkError") {
+    label = t("updates.check.failed");
+    tone = "warning";
+  } else if (status.kind === "available") {
+    label = t("updates.check.install", { version: status.version });
+    Icon = Download;
+    onClick = () => void startInstall();
+    tone = "accent";
+  } else if (status.kind === "downloading") {
+    const percent =
+      status.total && status.total > 0
+        ? Math.min(99, Math.floor((status.downloaded / status.total) * 100))
+        : null;
+    label =
+      percent === null
+        ? t("updates.pill.downloadingIndeterminate")
+        : t("updates.pill.downloading", { percent });
+    Icon = Loader2;
+    spinning = true;
+    onClick = null;
+  } else if (status.kind === "installing") {
+    label = t("updates.pill.installing");
+    Icon = Loader2;
+    spinning = true;
+    onClick = null;
+  } else if (status.kind === "error") {
+    label = t("updates.pill.error");
+    onClick = () => void startInstall();
+    tone = "warning";
+  } else {
+    label = t("updates.check.action");
+  }
+
+  return (
+    <Button
+      variant="outline"
+      size="sm"
+      disabled={!onClick}
+      onClick={onClick ?? undefined}
+      title={status.kind === "checkError" ? status.message : undefined}
+      className={cn(
+        "font-normal",
+        tone === "accent" && "text-accent-blue hover:text-accent-blue",
+        tone === "warning" && "text-warning hover:text-warning",
+      )}
+    >
+      <Icon size={13} className={spinning ? "animate-spin" : undefined} />
+      {label}
+    </Button>
+  );
+}
+
 function ValueTrigger({ children }: { children: React.ReactNode }) {
   return (
     <DropdownMenuTrigger asChild>
@@ -67,12 +157,33 @@ export function SettingsDialog() {
   const mode = useThemeStore((s) => s.mode);
   const setMode = useThemeStore((s) => s.setMode);
 
+  // null while resolving and in the browser-mock mode, where the Tauri IPC
+  // behind getVersion does not exist; the row just omits the version then.
+  const [appVersion, setAppVersion] = useState<string | null>(null);
+  useEffect(() => {
+    getVersion()
+      .then(setAppVersion)
+      .catch(() => setAppVersion(null));
+  }, []);
+
+  const handleOpenChange = (next: boolean) => {
+    setOpen(next);
+    if (!next) {
+      // Check outcomes are answers to "is there an update right now?", so a
+      // reopened dialog should ask again instead of replaying a stale answer.
+      const kind = useUpdatesStore.getState().status.kind;
+      if (kind === "upToDate" || kind === "checkError") {
+        useUpdatesStore.getState().reset();
+      }
+    }
+  };
+
   const currentLanguage =
     SUPPORTED_LANGUAGES.find((l) => (i18n.resolvedLanguage ?? i18n.language) === l.id) ??
     SUPPORTED_LANGUAGES[0];
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="gap-0 p-0 sm:max-w-md">
         <DialogHeader className="border-b border-hairline px-4 py-3.5">
           <DialogTitle className="text-sm font-semibold">{t("settings.title")}</DialogTitle>
@@ -119,6 +230,16 @@ export function SettingsDialog() {
                 </DropdownMenuContent>
               </DropdownMenu>
             }
+          />
+
+          <SettingRow
+            icon={<RefreshCw size={15} />}
+            label={
+              appVersion
+                ? `${t("settings.updates")} (v${appVersion})`
+                : t("settings.updates")
+            }
+            control={<UpdatesControl />}
           />
         </div>
       </DialogContent>

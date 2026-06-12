@@ -79,7 +79,8 @@
     "themeSystem": "Sistema",
     "themeLight": "Claro",
     "themeDark": "Escuro",
-    "language": "Idioma"
+    "language": "Idioma",
+    "updates": "Atualizações"
   },
   "updates": {
     "pill": {
@@ -88,6 +89,13 @@
       "downloadingIndeterminate": "Baixando...",
       "installing": "Reiniciando...",
       "error": "Falha ao atualizar. Tentar de novo"
+    },
+    "check": {
+      "action": "Buscar atualizações",
+      "checking": "Verificando...",
+      "upToDate": "Tudo atualizado",
+      "failed": "Falha ao verificar. Repetir",
+      "install": "Atualizar para v{{version}}"
     }
   },
   "errors": {
