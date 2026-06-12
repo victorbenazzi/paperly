@@ -81,6 +81,15 @@
     "themeDark": "Escuro",
     "language": "Idioma"
   },
+  "updates": {
+    "pill": {
+      "available": "Atualizar v{{version}}",
+      "downloading": "Baixando {{percent}}%",
+      "downloadingIndeterminate": "Baixando...",
+      "installing": "Reiniciando...",
+      "error": "Falha ao atualizar. Tentar de novo"
+    }
+  },
   "errors": {
     "PathNotAllowed": "Esse caminho está fora dos seus vaults.",
     "NotFound": "Arquivo não encontrado.",

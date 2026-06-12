@@ -9,6 +9,7 @@
     "opener:default",
     "dialog:allow-open",
     "os:default",
-    "process:allow-restart"
+    "process:allow-restart",
+    "updater:default"
   ]
 }

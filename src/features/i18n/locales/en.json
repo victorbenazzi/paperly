@@ -81,6 +81,15 @@
     "themeDark": "Dark",
     "language": "Language"
   },
+  "updates": {
+    "pill": {
+      "available": "Update v{{version}}",
+      "downloading": "Downloading {{percent}}%",
+      "downloadingIndeterminate": "Downloading...",
+      "installing": "Restarting...",
+      "error": "Update failed. Retry"
+    }
+  },
   "errors": {
     "PathNotAllowed": "This path is outside your vaults.",
     "NotFound": "File not found.",

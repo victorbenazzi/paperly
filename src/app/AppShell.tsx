@@ -21,6 +21,7 @@ import { useNavStore } from "@/features/nav/nav.store";
 import { useWorkspacePersistence } from "@/features/vaults/workspace.persist";
 import { useWatcherIntegration } from "@/features/watcher/useWatcherIntegration";
 import { useKeyboardShortcuts } from "@/features/keybindings/useKeyboardShortcuts";
+import { checkSilent } from "@/features/updates/updates.service";
 
 /** Vault open, no note selected: a quiet nudge instead of the onboarding. */
 function EmptyNoteHint() {
@@ -44,6 +45,13 @@ export function AppShell() {
   useEffect(() => {
     void hydrate();
   }, [hydrate]);
+
+  // Silent updater probe, delayed past initial paint + vault hydration so it
+  // never competes for IPC bandwidth on cold boot; no-op in dev builds.
+  useEffect(() => {
+    const handle = window.setTimeout(() => void checkSilent(), 3000);
+    return () => window.clearTimeout(handle);
+  }, []);
 
   useWorkspacePersistence(activeVaultId);
   useWatcherIntegration(activeVaultId);

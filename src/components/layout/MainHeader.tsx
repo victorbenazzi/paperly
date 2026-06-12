@@ -11,6 +11,7 @@ import { useTreeStore } from "@/features/tree/tree.store";
 import { closeDeletedPaths } from "@/features/pages/pagePaths";
 import { Button } from "@/components/ui/button";
 import { Breadcrumb } from "@/components/layout/Breadcrumb";
+import { UpdatePill } from "@/components/updates/UpdatePill";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -59,6 +60,8 @@ export function MainHeader() {
     >
       <Breadcrumb />
       <div data-tauri-drag-region className="min-w-0 flex-1" />
+
+      <UpdatePill />
 
       {openPath ? (
         <DropdownMenu>
