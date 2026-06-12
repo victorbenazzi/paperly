@@ -14,8 +14,9 @@ import { cn } from "@/lib/utils";
 import { errorMessage } from "@/lib/ipc";
 import { TEXT_EXTS, type TreeNode } from "@/features/tree/tree.types";
 import { useTreeStore } from "@/features/tree/tree.store";
-import { useDragStore } from "@/features/tree/drag.store";
+import { useDragStore, dragJustEnded } from "@/features/tree/drag.store";
 import { useNavStore } from "@/features/nav/nav.store";
+import { usePageMetaStore } from "@/features/pages/pageMeta.store";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -32,7 +33,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { CMD, ipc } from "@/lib/ipc";
 
-const KIND_ICON = {
+export const KIND_ICON = {
   note: FileText,
   folderNote: FileText,
   folder: Folder,
@@ -65,7 +66,20 @@ export function TreeItem({ node, depth, expanded, onToggle }: TreeItemProps) {
   const dropDir = useDragStore((s) => s.dropDir);
   const beginDrag = useDragStore((s) => s.begin);
 
+  const isPage = node.kind === "note" || node.kind === "folderNote";
+
+  // Emoji icon from the page's frontmatter; falls back to the kind icon.
+  const pageIcon = usePageMetaStore((s) => (isPage ? s.icons[node.path] : undefined));
+  const requestIcon = usePageMetaStore((s) => s.request);
+  useEffect(() => {
+    if (isPage && pageIcon === undefined) requestIcon(node.path);
+  }, [isPage, pageIcon, node.path, requestIcon]);
+
   const [draft, setDraft] = useState(node.name);
+  // The row actions live in a hover-only span. While the "more" menu is open
+  // the trigger must stay laid out, or Radix loses its anchor rect and the
+  // menu snaps to the viewport's top-left corner.
+  const [menuOpen, setMenuOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const pressRef = useRef<{ x: number; y: number } | null>(null);
 
@@ -80,11 +94,15 @@ export function TreeItem({ node, depth, expanded, onToggle }: TreeItemProps) {
     }
   }, [renaming, node.name]);
 
-  const isPage = node.kind === "note" || node.kind === "folderNote";
   const expandable = node.dirPath !== null;
   const isDropTarget = dragging && node.dirPath && dropDir === node.dirPath && dragging.path !== node.path;
+  // Dropping onto a plain note/file lands NEXT to it (its parent dir), so a
+  // drag over any row always has a sensible target instead of falling
+  // through to the vault root.
+  const dropDirForRow = node.dirPath ?? node.path.slice(0, node.path.lastIndexOf("/"));
 
   const activate = () => {
+    if (dragJustEnded()) return;
     select(node.path);
     if (isPage || node.kind === "image") {
       openNote(node.path);
@@ -131,6 +149,24 @@ export function TreeItem({ node, depth, expanded, onToggle }: TreeItemProps) {
     }
   };
 
+  const addSubfolder = async () => {
+    try {
+      let dir = node.dirPath;
+      if (isPage && !dir) {
+        const parent = node.path.slice(0, node.path.lastIndexOf("/"));
+        dir = await createFolder(parent, node.name);
+      }
+      if (!dir) return;
+      const path = await createFolder(dir, t("tree.untitledFolder"));
+      if (!useTreeStore.getState().expanded.has(dir)) toggleExpanded(dir);
+      await useTreeStore.getState().loadDir(dir);
+      select(path);
+      startRename(path);
+    } catch (err) {
+      console.error("add subfolder failed:", errorMessage(err));
+    }
+  };
+
   const remove = async () => {
     try {
       await deleteNode(node.path, node.dirPath);
@@ -145,12 +181,12 @@ export function TreeItem({ node, depth, expanded, onToggle }: TreeItemProps) {
 
   const row = (
     <div
-      data-drop-dir={node.dirPath ?? undefined}
+      data-drop-dir={dropDirForRow}
       className={cn(
-        "group flex h-7 cursor-default items-center gap-1 rounded-sm pr-1 text-sm",
+        "group flex h-7 cursor-pointer items-center gap-1 rounded-sm pr-1 text-sm",
         "text-ink-secondary transition-colors duration-(--dur-fast)",
         selected ? "bg-hover-wash-strong text-ink" : "hover:bg-hover-wash hover:text-ink",
-        isDropTarget && "bg-accent-blue-soft outline-1 outline-accent-blue/40",
+        isDropTarget && "bg-accent-blue-soft outline-1 outline-accent-blue/50 -outline-offset-1",
         dragging?.path === node.path && "opacity-40",
       )}
       style={{ paddingLeft: `${8 + depth * 14}px` }}
@@ -161,9 +197,15 @@ export function TreeItem({ node, depth, expanded, onToggle }: TreeItemProps) {
       }}
       onPointerMove={(e) => {
         if (!pressRef.current || dragging) return;
+        // The press may have been released outside this row (its pointerup
+        // never fires); only a held left button counts as a drag intent.
+        if (e.buttons !== 1) {
+          pressRef.current = null;
+          return;
+        }
         const dx = e.clientX - pressRef.current.x;
         const dy = e.clientY - pressRef.current.y;
-        if (Math.hypot(dx, dy) > 6) beginDrag(node);
+        if (Math.hypot(dx, dy) > 6) beginDrag(node, e.clientX, e.clientY);
       }}
       onPointerUp={() => {
         pressRef.current = null;
@@ -188,7 +230,13 @@ export function TreeItem({ node, depth, expanded, onToggle }: TreeItemProps) {
         ) : null}
       </span>
 
-      <Icon size={15} className="shrink-0 text-ink-muted" />
+      {pageIcon ? (
+        <span className="flex size-[15px] shrink-0 items-center justify-center text-[13px] leading-none">
+          {pageIcon}
+        </span>
+      ) : (
+        <Icon size={15} className="shrink-0 text-ink-muted" />
+      )}
 
       {renaming ? (
         <input
@@ -208,8 +256,15 @@ export function TreeItem({ node, depth, expanded, onToggle }: TreeItemProps) {
       )}
 
       {!renaming ? (
-        <span className="hidden shrink-0 items-center gap-0.5 group-hover:flex">
-          <DropdownMenu>
+        // Hidden while dragging so the buttons don't flicker under the ghost.
+        <span
+          className={cn(
+            "hidden shrink-0 items-center gap-0.5",
+            !dragging && "group-hover:flex",
+            menuOpen && "flex",
+          )}
+        >
+          <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
@@ -220,11 +275,22 @@ export function TreeItem({ node, depth, expanded, onToggle }: TreeItemProps) {
                 <MoreHorizontal size={14} />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" onClick={(e) => e.stopPropagation()}>
+            <DropdownMenuContent align="end" side="bottom" sideOffset={4} onClick={(e) => e.stopPropagation()}>
               <DropdownMenuItem onClick={() => startRename(node.path)}>
                 {t("tree.rename")}
               </DropdownMenuItem>
               <DropdownMenuItem onClick={reveal}>{t("tree.reveal")}</DropdownMenuItem>
+              {(isPage || node.kind === "folder") && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => void addSubpage()}>
+                    {t("tree.newSubpage")}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => void addSubfolder()}>
+                    {t("tree.newFolder")}
+                  </DropdownMenuItem>
+                </>
+              )}
               <DropdownMenuSeparator />
               <DropdownMenuItem variant="destructive" onClick={() => void remove()}>
                 {t("tree.delete")}
@@ -232,17 +298,30 @@ export function TreeItem({ node, depth, expanded, onToggle }: TreeItemProps) {
             </DropdownMenuContent>
           </DropdownMenu>
           {isPage || node.kind === "folder" ? (
-            <button
-              type="button"
-              aria-label={t("tree.newSubpage")}
-              onClick={(e) => {
-                e.stopPropagation();
-                void addSubpage();
-              }}
-              className="flex size-5 items-center justify-center rounded-xs text-ink-faint hover:bg-hover-wash-strong hover:text-ink"
-            >
-              <Plus size={14} />
-            </button>
+            <>
+              <button
+                type="button"
+                aria-label={t("tree.newFolder")}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void addSubfolder();
+                }}
+                className="flex size-5 items-center justify-center rounded-xs text-ink-faint hover:bg-hover-wash-strong hover:text-ink"
+              >
+                <Folder size={14} />
+              </button>
+              <button
+                type="button"
+                aria-label={t("tree.newSubpage")}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void addSubpage();
+                }}
+                className="flex size-5 items-center justify-center rounded-xs text-ink-faint hover:bg-hover-wash-strong hover:text-ink"
+              >
+                <Plus size={14} />
+              </button>
+            </>
           ) : null}
         </span>
       ) : null}
@@ -257,9 +336,14 @@ export function TreeItem({ node, depth, expanded, onToggle }: TreeItemProps) {
           {t("tree.rename")}
         </ContextMenuItem>
         {isPage || node.kind === "folder" ? (
-          <ContextMenuItem onClick={() => void addSubpage()}>
-            {t("tree.newSubpage")}
-          </ContextMenuItem>
+          <>
+            <ContextMenuItem onClick={() => void addSubpage()}>
+              {t("tree.newSubpage")}
+            </ContextMenuItem>
+            <ContextMenuItem onClick={() => void addSubfolder()}>
+              {t("tree.newFolder")}
+            </ContextMenuItem>
+          </>
         ) : null}
         <ContextMenuItem onClick={reveal}>{t("tree.reveal")}</ContextMenuItem>
         <ContextMenuSeparator />

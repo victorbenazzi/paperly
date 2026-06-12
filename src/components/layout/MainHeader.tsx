@@ -1,123 +1,124 @@
 import { useTranslation } from "react-i18next";
-import { ChevronsRight, Languages, Moon, Sparkles, Sun, SunMoon } from "lucide-react";
+import { MoreHorizontal, Settings, Sparkles, Trash2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { CMD, errorMessage, ipc } from "@/lib/ipc";
+import { isMarkdown, stripMdExt } from "@/features/tree/tree.types";
 import { useUiStore } from "@/features/ui/ui.store";
-import { useThemeStore, type ThemeMode } from "@/features/theme/theme.store";
-import { SUPPORTED_LANGUAGES } from "@/features/i18n/config";
+import { useVaultsStore, activeVault } from "@/features/vaults/vaults.store";
+import { useNavStore } from "@/features/nav/nav.store";
+import { useTreeStore } from "@/features/tree/tree.store";
 import { Button } from "@/components/ui/button";
+import { Breadcrumb } from "@/components/layout/Breadcrumb";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
-const THEME_ICONS: Record<ThemeMode, React.ReactNode> = {
-  system: <SunMoon size={16} />,
-  light: <Sun size={16} />,
-  dark: <Moon size={16} />,
-};
-
 export function MainHeader() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
-  const toggleSidebar = useUiStore((s) => s.toggleSidebar);
+  const vault = useVaultsStore((s) => activeVault(s));
   const toggleAgentPanel = useUiStore((s) => s.toggleAgentPanel);
-  const mode = useThemeStore((s) => s.mode);
-  const setMode = useThemeStore((s) => s.setMode);
+  const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
+  const openPath = useNavStore((s) => s.openPath);
+  const closeNote = useNavStore((s) => s.close);
+  const deleteNode = useTreeStore((s) => s.deleteNode);
+
+  const reveal = () => {
+    if (openPath) void ipc(CMD.revealInFinder, { path: openPath }).catch(() => {});
+  };
+
+  const remove = async () => {
+    if (!openPath) return;
+    const name = openPath.split("/").pop() ?? "";
+    // Folder notes pair `X.md` with `X/`; deleteNode ignores a missing dir.
+    const dirPath = isMarkdown(name)
+      ? openPath.slice(0, openPath.length - name.length) + stripMdExt(name)
+      : null;
+    try {
+      await deleteNode(openPath, dirPath);
+      closeNote();
+    } catch (err) {
+      console.error("delete failed:", errorMessage(err));
+    }
+  };
 
   return (
     <header
       data-tauri-drag-region
       className={cn(
         "flex h-12 shrink-0 items-center gap-1 px-2",
-        !sidebarOpen && "pl-[86px]",
+        // Sidebar closed OR hidden (no vault): clear the macOS traffic lights.
+        (!sidebarOpen || !vault) && "pl-[86px]",
       )}
     >
-      {!sidebarOpen ? (
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          aria-label={t("titlebar.toggleSidebar")}
-          onClick={toggleSidebar}
-          className="text-ink-muted hover:text-ink"
-        >
-          <ChevronsRight size={16} />
-        </Button>
+      <Breadcrumb />
+      <div data-tauri-drag-region className="min-w-0 flex-1" />
+
+      {openPath ? (
+        <DropdownMenu>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={t("titlebar.pageOptions")}
+                  className="text-ink-muted hover:text-ink"
+                >
+                  <MoreHorizontal size={16} />
+                </Button>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">{t("titlebar.pageOptions")}</TooltipContent>
+          </Tooltip>
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuItem onClick={reveal}>{t("tree.reveal")}</DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => void remove()} variant="destructive">
+              <Trash2 size={14} />
+              {t("tree.delete")}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       ) : null}
 
-      <div data-tauri-drag-region className="flex-1" />
-
-      <DropdownMenu>
+      {vault ? (
         <Tooltip>
           <TooltipTrigger asChild>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label={t("settings.theme")}
-                className="text-ink-muted hover:text-ink"
-              >
-                {THEME_ICONS[mode]}
-              </Button>
-            </DropdownMenuTrigger>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={t("titlebar.toggleAgent")}
+              onClick={toggleAgentPanel}
+              className="text-ink-muted hover:text-ink"
+            >
+              <Sparkles size={16} />
+            </Button>
           </TooltipTrigger>
-          <TooltipContent side="bottom">{t("settings.theme")}</TooltipContent>
+          <TooltipContent side="bottom">{t("titlebar.toggleAgent")}</TooltipContent>
         </Tooltip>
-        <DropdownMenuContent align="end">
-          <DropdownMenuItem onClick={() => setMode("system")}>
-            <SunMoon size={14} /> {t("settings.themeSystem")}
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setMode("light")}>
-            <Sun size={14} /> {t("settings.themeLight")}
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setMode("dark")}>
-            <Moon size={14} /> {t("settings.themeDark")}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      <DropdownMenu>
+      ) : (
         <Tooltip>
           <TooltipTrigger asChild>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label={t("settings.language")}
-                className="text-ink-muted hover:text-ink"
-              >
-                <Languages size={16} />
-              </Button>
-            </DropdownMenuTrigger>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={t("settings.title")}
+              onClick={() => setSettingsOpen(true)}
+              className="text-ink-muted hover:text-ink"
+            >
+              <Settings size={16} />
+            </Button>
           </TooltipTrigger>
-          <TooltipContent side="bottom">{t("settings.language")}</TooltipContent>
+          <TooltipContent side="bottom">{t("settings.title")}</TooltipContent>
         </Tooltip>
-        <DropdownMenuContent align="end">
-          {SUPPORTED_LANGUAGES.map((lang) => (
-            <DropdownMenuItem key={lang.id} onClick={() => void i18n.changeLanguage(lang.id)}>
-              {lang.native}
-            </DropdownMenuItem>
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon-sm"
-            aria-label={t("titlebar.toggleAgent")}
-            onClick={toggleAgentPanel}
-            className="text-ink-muted hover:text-ink"
-          >
-            <Sparkles size={16} />
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent side="bottom">{t("titlebar.toggleAgent")}</TooltipContent>
-      </Tooltip>
+      )}
     </header>
   );
 }

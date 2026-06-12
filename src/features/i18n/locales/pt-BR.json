@@ -1,43 +1,76 @@
 {
   "app": {
-    "name": "noteflow"
+    "name": "Paperly"
   },
   "titlebar": {
-    "toggleSidebar": "Alternar barra lateral",
-    "toggleAgent": "Alternar painel de IA"
+    "toggleAgent": "Alternar painel de IA",
+    "pageOptions": "Opções da página"
   },
   "sidebar": {
     "noVault": "Nenhum vault aberto",
     "openVault": "Abrir vault",
+    "collapse": "Fechar",
+    "expand": "Abrir",
     "removeVault": "Remover vault da lista",
     "newPage": "Nova página",
+    "newFolder": "Nova pasta",
     "search": "Buscar"
   },
   "tree": {
     "untitled": "Sem título",
+    "untitledFolder": "Sem título",
     "rename": "Renomear",
     "delete": "Mover para a Lixeira",
     "reveal": "Mostrar no Finder",
     "newSubpage": "Nova subpágina",
+    "newFolder": "Nova pasta",
     "more": "Mais opções"
   },
   "noteView": {
     "loading": "Carregando..."
   },
+  "page": {
+    "addIcon": "Adicionar ícone",
+    "changeIcon": "Alterar ícone",
+    "removeIcon": "Remover",
+    "outline": "Sumário"
+  },
   "welcome": {
-    "title": "Suas notas, como arquivos de verdade.",
-    "subtitle": "O noteflow guarda tudo em Markdown comum no seu disco. Abra uma pasta como vault e comece a escrever. Seus agentes de IA leem e editam os mesmos arquivos.",
-    "openVault": "Abrir pasta como vault",
+    "title": "Comece seu espaço de trabalho",
+    "subtitle": "Suas notas vivem como arquivos Markdown comuns, numa pasta que é sua. Crie um vault novo ou aponte o Paperly para uma pasta que você já tem.",
+    "createEmpty": "Criar vault vazio",
+    "createEmptyHint": "Comece do zero numa pasta nova vazia",
+    "chooseFolder": "Escolher uma pasta",
+    "chooseFolderHint": "Aponte para uma pasta que você já tem",
+    "defaultVaultName": "Meu Vault",
     "hint": "Nada sai do seu Mac. Sem conta, sem sync, sem lock-in."
   },
   "editor": {
-    "empty": "Selecione uma nota na barra lateral, ou crie uma nova página."
+    "empty": "Selecione uma nota na barra lateral, ou crie uma nova página.",
+    "externalEditMessage": "Esta nota foi editada fora do Paperly.",
+    "conflictMessage": "Esta nota foi editada fora do Paperly enquanto você tinha alterações não salvas.",
+    "reloadFromDisk": "Recarregar do disco",
+    "keepMyVersion": "Manter minha versão"
+  },
+  "search": {
+    "quickSwitcher": "Navegação rápida",
+    "quickSwitcherHint": "Pule para uma nota pelo nome",
+    "quickSwitcherPlaceholder": "Digite para buscar notas...",
+    "fullText": "Buscar no vault",
+    "fullTextHint": "Buscar no conteúdo das notas",
+    "fullTextPlaceholder": "Buscar em todas as notas...",
+    "noResults": "Nenhum resultado encontrado.",
+    "searching": "Buscando...",
+    "matchCount": "{{count}} resultados em {{ms}}ms",
+    "truncated": "truncado",
+    "error": "A busca falhou: {{message}}"
   },
   "agent": {
     "title": "Assistente",
     "placeholder": "O painel de IA chega numa fase futura."
   },
   "settings": {
+    "title": "Configurações",
     "theme": "Tema",
     "themeSystem": "Sistema",
     "themeLight": "Claro",

@@ -1,4 +1,4 @@
-# Plano: noteflow, um Notion clone local (markdown vault + agentes de IA)
+# Plano: Paperly, um Notion clone local (markdown vault + agentes de IA)
 
 ## Contexto
 
@@ -35,7 +35,7 @@ O metacodex (`/Users/victor/Documents/metacodex`) NÃO é modificado; serve de r
 8. **Wiki-links `[[Nome da Nota]]`** como formato primário (compat Obsidian + agentes); aceita `[texto](caminho.md)` na leitura. Custom inline content no schema BlockNote; resolução por basename case-insensitive via índice da árvore; autocomplete `[[` fica pra v1.5.
 9. **Deletar = Lixeira do macOS** (crate `trash`): notas são dados do usuário, não código versionado.
 10. **CSP `null`** (como o metacodex): necessário para fetch/SSE do webview com `http://127.0.0.1:<porta>` do sidecar. App local-first; documentar no README.
-11. **Dev isolation**: env var `NOTEFLOW_HOME` (`~/.noteflow` vs `~/.noteflow-dev`), espelho do `METACODEX_HOME`.
+11. **Dev isolation**: env var `PAPERLY_HOME` (`~/.paperly` vs `~/.paperly-dev`), espelho do `METACODEX_HOME`.
 
 ## Design system (tokens)
 
@@ -61,7 +61,7 @@ noteflow/
 ├── src-tauri/src/
 │   ├── lib.rs / main.rs          # builder, generate_handler, managed state
 │   ├── error.rs                  # AppError {code,message} (porte de metacodex error.rs)
-│   ├── config_paths.rs           # ~/.noteflow, NOTEFLOW_HOME, read_json/write_json_atomic
+│   ├── config_paths.rs           # ~/.paperly, PAPERLY_HOME, read_json/write_json_atomic
 │   ├── util/paths.rs             # normalize léxico + ensure_within_roots (porte 1:1)
 │   ├── fs_ops.rs                 # atomic_write tmp→rename, read_dir, stat, text/bytes
 │   ├── vaults.rs                 # VaultsCache (análogo a projects.rs), fonte dos roots
@@ -75,7 +75,7 @@ noteflow/
 │   ├── features/{theme,i18n,vaults,tree,nav,editor,assets,search,agent,settings,templates}/
 │   ├── lib/                      # ipc.ts (CMD const + invoke<T>), cn.ts, events.ts, fuzzy.ts
 │   └── styles/tokens.css
-└── ~/.noteflow/                  # settings.json + state/{vaults.json, workspace/{vaultId}.json}
+└── ~/.paperly/                  # settings.json + state/{vaults.json, workspace/{vaultId}.json}
 ```
 
 Persistência: JSON atômico legível, padrão `write_json_atomic`/`read_json` com defaults (nunca crash em arquivo corrompido). Workspace por vault: `{expanded, openPath, sidebarWidth}` debounced 500ms.
@@ -101,9 +101,9 @@ pnpm add zustand i18next react-i18next clsx tailwind-merge lucide-react nanoid @
 pnpm add @tauri-apps/api @tauri-apps/plugin-dialog @tauri-apps/plugin-os @tauri-apps/plugin-process
 ```
 Cargo: `tauri@2`, plugins `single-instance/dialog/os/process`, `serde(_json)`, `thiserror`, `tokio(full)`, `parking_lot`, `uuid`, `chrono`, `dirs`, `which`. Pinar versões exatas no primeiro commit.
-`tauri.conf.json`: identifier `com.noteflow.app`, `titleBarStyle: "Overlay"` + `hiddenTitle: true`, min 880×560, `security.csp: null`, porta 1420.
-Portar: `error.rs`, `config_paths.rs` (NOTEFLOW_HOME), `util/paths.rs`. tokens.css completo. `theme.store` (localStorage no module load, sem FOUC, matchMedia) + i18n en/pt-BR no module load. TitleBar com `data-tauri-drag-region` em CADA elemento do click path. Shell 3 colunas (sidebar | editor | painel IA colapsado). Script `scripts/check-no-emdash.sh` (grep `—`/`–` em src/) no `pnpm build`.
-**Verificar**: janela abre e arrasta pela titlebar; toggle light/dark sem flash e persiste; pt-BR persiste; `NOTEFLOW_HOME=~/.noteflow-dev` cria árvore isolada; grep de em-dash vazio.
+`tauri.conf.json`: identifier `com.paperly.app`, `titleBarStyle: "Overlay"` + `hiddenTitle: true`, min 880×560, `security.csp: null`, porta 1420.
+Portar: `error.rs`, `config_paths.rs` (PAPERLY_HOME), `util/paths.rs`. tokens.css completo. `theme.store` (localStorage no module load, sem FOUC, matchMedia) + i18n en/pt-BR no module load. TitleBar com `data-tauri-drag-region` em CADA elemento do click path. Shell 3 colunas (sidebar | editor | painel IA colapsado). Script `scripts/check-no-emdash.sh` (grep `—`/`–` em src/) no `pnpm build`.
+**Verificar**: janela abre e arrasta pela titlebar; toggle light/dark sem flash e persiste; pt-BR persiste; `PAPERLY_HOME=~/.paperly-dev` cria árvore isolada; grep de em-dash vazio.
 
 ### Fase 1: Vaults + árvore + CRUD
 Comandos (todos FS com `ensure_within_roots`; roots = vaults do `VaultsCache`):
@@ -125,7 +125,7 @@ Front: `useVaultImage` (path → object URL, cache + revoke); resolver de imagen
 
 ### Fase 4: Watcher + busca + wiki-links
 Cargo: `notify`, `notify-debouncer-mini`, `ignore`, `grep-{searcher,regex,matcher}`.
-Portar `watcher.rs` (80ms, idempotente, keyed por vaultId, MANTER o rewrite de prefixo canônico→root do FSEvents, sem ele vault em pasta iCloud/symlink fica morto; filtrar `.git/`, `.obsidian/`, `.noteflow/`). Evento `fs://changed {vaultId, paths}` → invalida dirCache + fluxo de conflito do editor.
+Portar `watcher.rs` (80ms, idempotente, keyed por vaultId, MANTER o rewrite de prefixo canônico→root do FSEvents, sem ele vault em pasta iCloud/symlink fica morto; filtrar `.git/`, `.obsidian/`, `.paperly/`). Evento `fs://changed {vaultId, paths}` → invalida dirCache + fluxo de conflito do editor.
 `search_in_vault` + `list_files`; Cmd+P quick switcher (cmdk + fuzzy portado) e Cmd+Shift+F com snippets. Wiki-links `[[nota]]` (inline content + navegação).
 **Verificar**: `touch nota.md` no terminal → árvore atualiza <200ms; edição externa da nota aberta recarrega (banner se dirty); autosave NÃO flicka a própria nota; Cmd+P fuzzy acha por nome; Cmd+Shift+F acha por conteúdo; `[[link]]` navega.
 
@@ -147,7 +147,7 @@ Block `embed` allowlisted. Templates .md (prompt de agente, skill, spec) i18n-aw
 | Licença AGPL do xl-markdown | Spike; fallback lossy do core é aceitável |
 | Eco autosave ↔ watcher (loop de reload) | Compare `lastSavedContent` + skip-if-equal + guarda de dirty |
 | FSEvents canonicaliza paths (vault iCloud/symlink) | Portar o rewrite de prefixo do watcher do metacodex |
-| Dev + app instalado disputando estado/sidecar | `NOTEFLOW_HOME` + guarda de config-root na adoção |
+| Dev + app instalado disputando estado/sidecar | `PAPERLY_HOME` + guarda de config-root na adoção |
 | Perda de dados em delete | Lixeira via crate `trash` |
 
 ## Notas de execução

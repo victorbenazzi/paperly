@@ -1,8 +1,8 @@
-//! Resolves and manages noteflow's on-disk config + state under `~/.noteflow`.
+//! Resolves and manages Paperly's on-disk config + state under `~/.paperly`.
 //!
 //! Layout:
 //! ```text
-//! ~/.noteflow/
+//! ~/.paperly/
 //! ├── settings.json          # user prefs (hand-editable)
 //! └── state/
 //!     ├── vaults.json         # { vaults, lastActiveVaultId }
@@ -21,44 +21,44 @@ use serde::Serialize;
 
 use crate::error::{AppError, AppResult};
 
-/// Root of all noteflow config + state: `~/.noteflow`.
+/// Root of all Paperly config + state: `~/.paperly`.
 ///
-/// Honors `NOTEFLOW_HOME` when set + non-empty, so a dev build can run with an
-/// isolated state dir (e.g. `NOTEFLOW_HOME=~/.noteflow-dev pnpm tauri dev`)
-/// without clobbering an installed noteflow's vaults/settings.
+/// Honors `PAPERLY_HOME` when set + non-empty, so a dev build can run with an
+/// isolated state dir (e.g. `PAPERLY_HOME=~/.paperly-dev pnpm tauri dev`)
+/// without clobbering an installed Paperly's vaults/settings.
 pub fn config_root() -> AppResult<PathBuf> {
-    if let Ok(dir) = std::env::var("NOTEFLOW_HOME") {
+    if let Ok(dir) = std::env::var("PAPERLY_HOME") {
         let trimmed = dir.trim();
         if !trimmed.is_empty() {
             return Ok(PathBuf::from(trimmed));
         }
     }
     dirs::home_dir()
-        .map(|h| h.join(".noteflow"))
+        .map(|h| h.join(".paperly"))
         .ok_or_else(|| AppError::Other("could not resolve home directory".into()))
 }
 
-/// `~/.noteflow/settings.json`, user preferences, hand-editable.
+/// `~/.paperly/settings.json`, user preferences, hand-editable.
 pub fn settings_file() -> AppResult<PathBuf> {
     Ok(config_root()?.join("settings.json"))
 }
 
-/// `~/.noteflow/state`, app-managed state (not meant for hand-editing).
+/// `~/.paperly/state`, app-managed state (not meant for hand-editing).
 pub fn state_dir() -> AppResult<PathBuf> {
     Ok(config_root()?.join("state"))
 }
 
-/// `~/.noteflow/state/vaults.json`, the vault registry + active id.
+/// `~/.paperly/state/vaults.json`, the vault registry + active id.
 pub fn vaults_file() -> AppResult<PathBuf> {
     Ok(state_dir()?.join("vaults.json"))
 }
 
-/// `~/.noteflow/state/workspace`, one file per vault.
+/// `~/.paperly/state/workspace`, one file per vault.
 pub fn workspace_dir() -> AppResult<PathBuf> {
     Ok(state_dir()?.join("workspace"))
 }
 
-/// `~/.noteflow/state/runtime.json`, sidecar adoption info (pid, url).
+/// `~/.paperly/state/runtime.json`, sidecar adoption info (pid, url).
 pub fn runtime_file() -> AppResult<PathBuf> {
     Ok(state_dir()?.join("runtime.json"))
 }
@@ -82,7 +82,7 @@ pub fn workspace_file(vault_id: &str) -> AppResult<PathBuf> {
     Ok(workspace_dir()?.join(format!("{vault_id}.json")))
 }
 
-/// Create the `~/.noteflow` tree (root + state + workspace). Idempotent.
+/// Create the `~/.paperly` tree (root + state + workspace). Idempotent.
 /// Creating the deepest dir (`workspace`) implies its ancestors.
 pub fn ensure_dirs() -> AppResult<()> {
     fs::create_dir_all(workspace_dir()?)?;
@@ -100,7 +100,7 @@ pub fn read_json<T: DeserializeOwned + Default>(path: &Path) -> AppResult<T> {
             Ok(value) => Ok(value),
             Err(e) => {
                 eprintln!(
-                    "[noteflow] config parse failed for {}: {e}; using defaults",
+                    "[paperly] config parse failed for {}: {e}; using defaults",
                     path.display()
                 );
                 Ok(T::default())
@@ -125,7 +125,7 @@ pub fn read_json_backed<T: DeserializeOwned + Default>(path: &Path) -> AppResult
                     path.file_name().and_then(|s| s.to_str()).unwrap_or("config")
                 ));
                 eprintln!(
-                    "[noteflow] config parse failed for {}: {e}; moving it to {} and using defaults",
+                    "[paperly] config parse failed for {}: {e}; moving it to {} and using defaults",
                     path.display(),
                     backup.display()
                 );
@@ -147,7 +147,7 @@ pub fn read_json_opt<T: DeserializeOwned>(path: &Path) -> AppResult<Option<T>> {
             Ok(value) => Ok(Some(value)),
             Err(e) => {
                 eprintln!(
-                    "[noteflow] config parse failed for {}: {e}; ignoring",
+                    "[paperly] config parse failed for {}: {e}; ignoring",
                     path.display()
                 );
                 Ok(None)
@@ -158,11 +158,11 @@ pub fn read_json_opt<T: DeserializeOwned>(path: &Path) -> AppResult<Option<T>> {
     }
 }
 
-/// Atomic, pretty-printed JSON write: serialize, write `<file>.noteflow.tmp`,
+/// Atomic, pretty-printed JSON write: serialize, write `<file>.paperly.tmp`,
 /// rename. Creates parent directories as needed.
 ///
 /// SECURITY: unlike the fs commands in `fs_ops`, this deliberately does NOT call
-/// `paths::ensure_within_roots`. These files live under `~/.noteflow`, outside
+/// `paths::ensure_within_roots`. These files live under `~/.paperly`, outside
 /// every registered vault root, so the roots check would reject them. It is
 /// safe because the destination path is always app-derived: read commands take
 /// no path argument, and write commands take only opaque JSON or a guarded
@@ -193,7 +193,7 @@ fn tmp_path(path: &Path) -> PathBuf {
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
     let file_name = path.file_name().and_then(|s| s.to_str()).unwrap_or("config");
     path.with_file_name(format!(
-        "{file_name}.noteflow.tmp.{}.{n}",
+        "{file_name}.paperly.tmp.{}.{n}",
         std::process::id()
     ))
 }

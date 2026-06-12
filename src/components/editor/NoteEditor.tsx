@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
+import { Smile } from "lucide-react";
 import { useCreateBlockNote } from "@blocknote/react";
 import {
   FormattingToolbar,
@@ -17,19 +18,57 @@ import "./blocknote-theme.css";
 import { useThemeStore } from "@/features/theme/theme.store";
 import { useEditorStore } from "@/features/editor/editor.store";
 import { codec } from "@/features/editor/markdown/codec";
+import { ensureWikiIndex, resolveWikiLink } from "@/features/editor/markdown/wikiLinks";
 import { useTreeStore } from "@/features/tree/tree.store";
 import { useNavStore } from "@/features/nav/nav.store";
 import { useVaultsStore, activeVault } from "@/features/vaults/vaults.store";
 import { uploadAssetToVault, resolveVaultFileUrl } from "@/features/assets/assets";
 import { stripMdExt, isMarkdown } from "@/features/tree/tree.types";
+import { renamePage } from "@/features/pages/renamePage";
+import { useOutlineStore, type OutlineHeading } from "@/features/outline/outline.store";
+import { IconPickerPopover } from "@/components/page/EmojiPicker";
 import { errorMessage } from "@/lib/ipc";
 
-function NoteTitle({ path }: { path: string }) {
+function inlineText(content: unknown): string {
+  if (!Array.isArray(content)) return "";
+  return content
+    .map((c) => {
+      const item = c as { type?: string; text?: string; content?: unknown };
+      if (item.type === "link") return inlineText(item.content);
+      return typeof item.text === "string" ? item.text : "";
+    })
+    .join("");
+}
+
+function collectHeadings(blocks: unknown[]): OutlineHeading[] {
+  const out: OutlineHeading[] = [];
+  const walk = (bs: unknown[]) => {
+    for (const b of bs) {
+      const block = b as {
+        id: string;
+        type?: string;
+        props?: { level?: number };
+        content?: unknown;
+        children?: unknown[];
+      };
+      if (block.type === "heading") {
+        out.push({
+          id: block.id,
+          text: inlineText(block.content).trim(),
+          level: block.props?.level ?? 1,
+        });
+      }
+      if (Array.isArray(block.children) && block.children.length > 0) walk(block.children);
+    }
+  };
+  walk(blocks);
+  return out;
+}
+
+function NoteTitle({ path, onSubmit }: { path: string; onSubmit?: () => void }) {
   const { t } = useTranslation();
   const name = stripMdExt(path.split("/").pop() ?? "");
   const [draft, setDraft] = useState(name);
-  const renameNode = useTreeStore((s) => s.renameNode);
-  const remapNav = useNavStore((s) => s.remap);
 
   useEffect(() => setDraft(name), [name]);
 
@@ -40,18 +79,7 @@ function NoteTitle({ path }: { path: string }) {
       return;
     }
     try {
-      // Flush content before the path changes under the editor.
-      await useEditorStore.getState().saveNow();
-      const dir = path.slice(0, path.lastIndexOf("/"));
-      const companion = `${dir}/${name}`;
-      const hasCompanion = isMarkdown(path) ? companion : null;
-      // renameNode handles the folder-note pair when dirPath is passed; we
-      // detect the companion folder from the tree cache.
-      const entries = useTreeStore.getState().dirCache[dir] ?? [];
-      const dirEntry = entries.find((e) => e.isDir && e.name === name);
-      const newPath = await renameNode(path, dirEntry ? (hasCompanion ?? null) : null, next);
-      remapNav(path, newPath);
-      useTreeStore.getState().select(newPath);
+      await renamePage(path, next);
     } catch (err) {
       console.error("title rename failed:", errorMessage(err));
       setDraft(name);
@@ -64,7 +92,10 @@ function NoteTitle({ path }: { path: string }) {
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => void commit()}
       onKeyDown={(e) => {
-        if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+        if (e.key === "Enter") {
+          (e.target as HTMLInputElement).blur();
+          onSubmit?.();
+        }
         if (e.key === "Escape") {
           setDraft(name);
           (e.target as HTMLInputElement).blur();
@@ -77,6 +108,48 @@ function NoteTitle({ path }: { path: string }) {
 }
 
 /**
+ * Notion-style page header: big emoji icon when set, otherwise an "add icon"
+ * action that fades in on hover above the title. The icon lives in the note's
+ * frontmatter and is mirrored to the tree via the page-meta cache.
+ */
+function PageHeader({ path, onTitleSubmit }: { path: string; onTitleSubmit?: () => void }) {
+  const { t } = useTranslation();
+  const icon = useEditorStore((s) => (typeof s.meta.icon === "string" ? s.meta.icon : null));
+  const setIcon = useEditorStore((s) => s.setIcon);
+
+  return (
+    <div className="group/page mb-4">
+      {icon ? (
+        <IconPickerPopover icon={icon} onPick={setIcon} onRemove={() => setIcon(null)}>
+          <button
+            type="button"
+            aria-label={t("page.changeIcon")}
+            className="-ml-1.5 mb-3 rounded-lg px-1.5 py-1 transition-colors duration-(--dur-fast) hover:bg-hover-wash"
+          >
+            <span className="block text-[64px] leading-[1.1]">{icon}</span>
+          </button>
+        </IconPickerPopover>
+      ) : (
+        // Reserved row above the title; visible on hover (or while picking),
+        // so the layout never shifts.
+        <div className="flex h-8 items-center opacity-0 transition-opacity duration-(--dur-fast) group-hover/page:opacity-100 has-[[data-state=open]]:opacity-100">
+          <IconPickerPopover icon={null} onPick={setIcon} onRemove={() => {}}>
+            <button
+              type="button"
+              className="flex items-center gap-1.5 rounded-sm px-1.5 py-1 text-sm text-ink-faint transition-colors duration-(--dur-fast) hover:bg-hover-wash hover:text-ink-muted"
+            >
+              <Smile size={15} />
+              {t("page.addIcon")}
+            </button>
+          </IconPickerPopover>
+        </div>
+      )}
+      <NoteTitle path={path} onSubmit={onTitleSubmit} />
+    </div>
+  );
+}
+
+/**
  * One BlockNote instance per note: the parent keys this component by path,
  * so switching notes tears down and rebuilds the editor (never reuse an
  * instance across files).
@@ -85,11 +158,10 @@ export function NoteEditor({ path }: { path: string }) {
   const { t } = useTranslation();
   const effective = useThemeStore((s) => s.effective);
   const vault = useVaultsStore((s) => activeVault(s));
+  const openNote = useNavStore((s) => s.open);
+  const select = useTreeStore((s) => s.select);
   const editor = useCreateBlockNote(
     {
-      // Pasted/dropped files land in <vault>/assets/; the block keeps the
-      // vault-relative path (what the markdown stores), and resolveFileUrl
-      // turns it into a displayable object URL at render time.
       uploadFile: vault ? (file: File) => uploadAssetToVault(vault.id, file) : undefined,
       resolveFileUrl: vault
         ? (url: string) => resolveVaultFileUrl(vault.path, url)
@@ -110,21 +182,58 @@ export function NoteEditor({ path }: { path: string }) {
         setLoadError(useEditorStore.getState().error);
         return;
       }
-      const blocks = await codec.markdownToBlocks(editor, body);
+      const vp = vault?.path;
+      // The index must be ready BEFORE the first parse, or every [[link]]
+      // in the note would fail to resolve.
+      if (vault) await ensureWikiIndex(vault.id);
+      const blocks = await codec.markdownToBlocks(editor, body, vp);
       if (cancelled) return;
       editor.replaceBlocks(editor.document, blocks);
       // Register the serializer only AFTER the initial content lands, so the
       // replaceBlocks onChange can never write a normalized doc on open.
-      useEditorStore.getState().registerSerializer(() => codec.blocksToMarkdown(editor));
+      useEditorStore.getState().registerSerializer(() => codec.blocksToMarkdown(editor, vp));
+      useEditorStore.getState().registerReloader(async (newBody) => {
+        const newBlocks = await codec.markdownToBlocks(editor, newBody, vp);
+        editor.replaceBlocks(editor.document, newBlocks);
+      });
+      useOutlineStore.getState().set(collectHeadings(editor.document));
       loadedFor.current = path;
       setReady(true);
     })();
     return () => {
       cancelled = true;
+      useOutlineStore.getState().clear();
       void useEditorStore.getState().close();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, path]);
+
+  // Internal note links: BlockNote renders plain anchors; .md hrefs are
+  // vault-relative (see wikiLinks.ts). Scoped to the editor container so
+  // anchors elsewhere in the app are never intercepted.
+  const handleEditorClick = (e: React.MouseEvent) => {
+    const anchor = (e.target as HTMLElement).closest("a");
+    if (!anchor) return;
+    const raw = anchor.getAttribute("href");
+    if (!raw || raw === "#") return;
+    if (/^[a-z][a-z0-9+.-]*:/i.test(raw)) return; // http(s), mailto... not ours
+    e.preventDefault();
+    let href = raw;
+    try {
+      href = decodeURI(raw);
+    } catch {
+      // malformed encoding; use as-is
+    }
+    const abs = href.startsWith("/") ? href : vault ? `${vault.path}/${href}` : null;
+    if (!abs) return;
+    const resolved = isMarkdown(abs.split("/").pop() ?? "")
+      ? abs
+      : resolveWikiLink(stripMdExt(href.split("/").pop() ?? href));
+    if (resolved) {
+      openNote(resolved);
+      select(resolved);
+    }
+  };
 
   if (loadError) {
     return (
@@ -136,20 +245,18 @@ export function NoteEditor({ path }: { path: string }) {
 
   return (
     <div className="mx-auto h-full max-w-3xl px-12 py-10">
-      <div className="mb-4">
-        <NoteTitle path={path} />
-      </div>
-      <div className={ready ? "" : "invisible"}>
+      <PageHeader path={path} onTitleSubmit={() => editor.focus()} />
+      {/* onClick handles in-vault note links; keyboard nav stays BlockNote's. */}
+      <div className={ready ? "" : "invisible"} onClick={handleEditorClick}>
         <BlockNoteView
           editor={editor}
           theme={effective}
           formattingToolbar={false}
           onChange={() => {
+            useOutlineStore.getState().set(collectHeadings(editor.document));
             if (loadedFor.current === path) useEditorStore.getState().scheduleSave();
           }}
         >
-          {/* Custom toolbar: everything except colors and alignment, which
-              markdown cannot represent and noteflow therefore doesn't offer. */}
           <FormattingToolbarController
             formattingToolbar={() => (
               <FormattingToolbar>

@@ -1,5 +1,5 @@
-//! Vault registry: the folders noteflow is allowed to touch. Persisted to
-//! `~/.noteflow/state/vaults.json`; mirrored in-memory (`VaultsCache`) so fs
+//! Vault registry: the folders Paperly is allowed to touch. Persisted to
+//! `~/.paperly/state/vaults.json`; mirrored in-memory (`VaultsCache`) so fs
 //! commands can validate path containment without re-reading JSON per request.
 
 use chrono::Utc;
@@ -54,6 +54,11 @@ impl VaultsCache {
             .iter()
             .find(|v| v.id == id)
             .map(|v| v.path.clone())
+    }
+    /// `path_of` for command handlers: unknown id becomes a NotFound error.
+    pub fn require_path(&self, id: &str) -> AppResult<String> {
+        self.path_of(id)
+            .ok_or_else(|| AppError::NotFound(format!("vault {id}")))
     }
 }
 

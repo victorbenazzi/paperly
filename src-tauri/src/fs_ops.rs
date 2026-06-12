@@ -297,7 +297,7 @@ pub fn save_asset(
     Ok(format!("assets/{name}"))
 }
 
-/// Atomic write: `<path>.<ext>.noteflow.tmp` then rename.
+/// Atomic write: `<path>.<ext>.paperly.tmp` then rename.
 pub fn write_file_text(app: &AppHandle, path: &str, content: &str) -> AppResult<()> {
     require_within_roots(app, path)?;
     atomic_write(Path::new(path), content.as_bytes())
@@ -305,7 +305,7 @@ pub fn write_file_text(app: &AppHandle, path: &str, content: &str) -> AppResult<
 
 pub fn atomic_write(path: &Path, bytes: &[u8]) -> AppResult<()> {
     let tmp = path.with_extension(format!(
-        "{}.noteflow.tmp",
+        "{}.paperly.tmp",
         path.extension().and_then(|s| s.to_str()).unwrap_or("")
     ));
     fs::write(&tmp, bytes).map_err(|e| io_error("write tmp", e))?;

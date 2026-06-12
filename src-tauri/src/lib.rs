@@ -1,9 +1,12 @@
 mod commands;
 mod config_paths;
 mod error;
+mod events;
 mod fs_ops;
+mod search;
 mod util;
 mod vaults;
+mod watcher;
 
 use std::sync::Arc;
 
@@ -32,6 +35,9 @@ pub fn run() {
             // dirs must exist BEFORE anything persists
             config_paths::ensure_dirs()?;
             vaults::hydrate(&app.app_handle().clone())?;
+            app.manage(Arc::new(watcher::WatcherManager::new(
+                app.app_handle().clone(),
+            )));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -62,6 +68,12 @@ pub fn run() {
             // workspace
             commands::workspace::save_workspace_state,
             commands::workspace::load_workspace_state,
+            // watcher
+            commands::watcher::watcher_watch,
+            commands::watcher::watcher_unwatch,
+            // search
+            commands::search::search_in_vault,
+            commands::search::list_files,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

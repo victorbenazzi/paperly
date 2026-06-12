@@ -32,6 +32,12 @@ export const CMD = {
   // workspace
   saveWorkspaceState: "save_workspace_state",
   loadWorkspaceState: "load_workspace_state",
+  // watcher
+  watcherWatch: "watcher_watch",
+  watcherUnwatch: "watcher_unwatch",
+  // search
+  searchInVault: "search_in_vault",
+  listFiles: "list_files",
 } as const;
 
 export type CmdName = (typeof CMD)[keyof typeof CMD];
@@ -115,4 +121,30 @@ export interface BytesFile {
   mime: string | null;
   truncated: boolean;
   size: number;
+}
+
+export interface SearchOptions {
+  caseSensitive?: boolean;
+  wholeWord?: boolean;
+  regex?: boolean;
+  maxMatches?: number;
+}
+
+export interface SearchMatch {
+  line: number;
+  start: number;
+  end: number;
+  lineText: string;
+}
+
+export interface SearchFileResult {
+  path: string;
+  matches: SearchMatch[];
+}
+
+export interface SearchResults {
+  files: SearchFileResult[];
+  totalMatches: number;
+  truncated: boolean;
+  elapsedMs: number;
 }

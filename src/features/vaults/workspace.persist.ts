@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 import { CMD, ipc } from "@/lib/ipc";
 import { useTreeStore } from "@/features/tree/tree.store";
 import { useNavStore } from "@/features/nav/nav.store";
+import { usePageMetaStore } from "@/features/pages/pageMeta.store";
 
 interface WorkspaceState {
   expanded: string[];
@@ -22,6 +23,7 @@ export function useWorkspacePersistence(vaultId: string | null) {
   useEffect(() => {
     useTreeStore.getState().reset();
     useNavStore.getState().close();
+    usePageMetaStore.getState().reset();
     hydratedFor.current = null;
     if (!vaultId) return;
 

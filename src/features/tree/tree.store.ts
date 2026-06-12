@@ -21,6 +21,12 @@ interface TreeState {
   startRename: (path: string | null) => void;
   /** Drop cached listings for these dirs and re-list the ones still loaded. */
   invalidateDirs: (dirPaths: string[]) => Promise<void>;
+  /**
+   * React to watcher events. FSEvents coalesces bursts into dir-level events,
+   * so each changed path refreshes its parent dir, itself (when it is a loaded
+   * dir) and every loaded dir underneath it.
+   */
+  handleFsChange: (paths: string[]) => void;
   reset: () => void;
 
   createNote: (parentDir: string, baseName: string) => Promise<string>;
@@ -83,6 +89,18 @@ export const useTreeStore = create<TreeState>((set, get) => ({
     await Promise.all(toReload.map((d) => get().loadDir(d)));
   },
 
+  handleFsChange: (paths) => {
+    const loaded = Object.keys(get().dirCache);
+    const toReload = new Set<string>();
+    for (const p of paths) {
+      const parent = parentOf(p);
+      for (const dir of loaded) {
+        if (dir === parent || dir === p || dir.startsWith(`${p}/`)) toReload.add(dir);
+      }
+    }
+    if (toReload.size > 0) void get().invalidateDirs([...toReload]);
+  },
+
   reset: () =>
     set({ dirCache: {}, expanded: new Set(), selectedPath: null, renamingPath: null }),
 
@@ -98,7 +116,11 @@ export const useTreeStore = create<TreeState>((set, get) => ({
     return path;
   },
 
-  createFolder: async (parentDir, name) => {
+  createFolder: async (parentDir, baseName) => {
+    const entries = get().dirCache[parentDir] ?? (await listDir(parentDir));
+    const taken = new Set(entries.filter((e) => e.isDir).map((e) => e.name.toLowerCase()));
+    let name = baseName;
+    for (let n = 2; taken.has(name.toLowerCase()); n++) name = `${baseName} ${n}`;
     const path = await ipc<string>(CMD.createDir, { parent: parentDir, name });
     await get().invalidateDirs([parentDir]);
     return path;

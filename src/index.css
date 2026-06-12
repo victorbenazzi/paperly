@@ -10,7 +10,7 @@
     --font-sans: 'Inter Variable', ui-sans-serif, system-ui, -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
     --font-heading: var(--font-sans);
 
-    /* shadcn semantic colors mapped onto the noteflow tokens */
+    /* shadcn semantic colors mapped onto the Paperly tokens */
     --color-background: var(--canvas);
     --color-foreground: var(--ink);
     --color-card: var(--surface);
@@ -43,7 +43,7 @@
     --color-chart-4: var(--sticker-pink);
     --color-chart-5: var(--sticker-green);
 
-    /* noteflow tokens as first-class utilities (bg-canvas, text-ink, border-hairline...) */
+    /* Paperly tokens as first-class utilities (bg-canvas, text-ink, border-hairline...) */
     --color-canvas: var(--canvas);
     --color-canvas-soft: var(--canvas-soft);
     --color-surface: var(--surface);
@@ -113,5 +113,61 @@
   .allow-select {
     user-select: text;
     cursor: auto;
+  }
+
+  /* Notion-style affordance: clickable things show a pointer (Tailwind v4
+     preflight resets buttons to cursor: default). Menu/command items carry
+     cursor-pointer in their own components since utilities beat this layer. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a[href],
+  label[for],
+  select:not(:disabled),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  /* While a tree node is being dragged, everything grabs. */
+  body[data-tree-dragging],
+  body[data-tree-dragging] * {
+    cursor: grabbing !important;
+  }
+
+  /* While the sidebar is being resized, keep the col-resize cursor everywhere
+     and stop hover/selection noise under the pointer. */
+  body[data-sidebar-resizing],
+  body[data-sidebar-resizing] * {
+    cursor: col-resize !important;
+    user-select: none !important;
+  }
+
+  /* The drawer transition is for open/close only; live-dragging the width
+     must track the pointer 1:1. */
+  body[data-sidebar-resizing] [data-sidebar-drawer] {
+    transition: none !important;
+  }
+
+  /* Notion-style scrollbars: a 4px pill floating in a 10px invisible gutter
+     (the transparent border is eaten by background-clip). No track, no arrows. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track,
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-button {
+    display: none;
+  }
+  ::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 9999px;
+    background-color: color-mix(in srgb, var(--ink) 14%, transparent);
+    background-clip: padding-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: color-mix(in srgb, var(--ink) 30%, transparent);
   }
 }

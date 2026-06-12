@@ -11,7 +11,7 @@ export const SUPPORTED_LANGUAGES = [
 
 export type LanguageId = (typeof SUPPORTED_LANGUAGES)[number]["id"];
 
-const STORAGE_KEY = "noteflow:language";
+const STORAGE_KEY = "paperly:language";
 
 function readStored(): LanguageId | null {
   try {

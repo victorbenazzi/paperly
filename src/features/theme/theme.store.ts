@@ -28,7 +28,7 @@ function applyTheme(effective: EffectiveTheme) {
   document.documentElement.setAttribute("data-theme", effective);
 }
 
-const MODE_KEY = "noteflow:theme";
+const MODE_KEY = "paperly:theme";
 
 function readStoredMode(): ThemeMode {
   try {

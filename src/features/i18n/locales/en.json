@@ -1,43 +1,76 @@
 {
   "app": {
-    "name": "noteflow"
+    "name": "Paperly"
   },
   "titlebar": {
-    "toggleSidebar": "Toggle sidebar",
-    "toggleAgent": "Toggle AI panel"
+    "toggleAgent": "Toggle AI panel",
+    "pageOptions": "Page options"
   },
   "sidebar": {
     "noVault": "No vault open",
     "openVault": "Open vault",
+    "collapse": "Close",
+    "expand": "Open",
     "removeVault": "Remove vault from list",
     "newPage": "New page",
+    "newFolder": "New folder",
     "search": "Search"
   },
   "tree": {
     "untitled": "Untitled",
+    "untitledFolder": "Untitled",
     "rename": "Rename",
     "delete": "Move to Trash",
     "reveal": "Reveal in Finder",
     "newSubpage": "New subpage",
+    "newFolder": "New folder",
     "more": "More options"
   },
   "noteView": {
     "loading": "Loading..."
   },
+  "page": {
+    "addIcon": "Add icon",
+    "changeIcon": "Change icon",
+    "removeIcon": "Remove",
+    "outline": "Table of contents"
+  },
   "welcome": {
-    "title": "Your notes, as plain files.",
-    "subtitle": "noteflow keeps everything in ordinary Markdown on your disk. Open a folder as a vault and start writing. Your AI agents can read and edit the same files.",
-    "openVault": "Open folder as vault",
+    "title": "Start your workspace",
+    "subtitle": "Your notes live as plain Markdown files in a folder you own. Create a fresh vault or point Paperly at a folder you already have.",
+    "createEmpty": "Create empty vault",
+    "createEmptyHint": "Start fresh in a new empty folder",
+    "chooseFolder": "Choose a folder",
+    "chooseFolderHint": "Point to a folder you already have",
+    "defaultVaultName": "My Vault",
     "hint": "Nothing leaves your Mac. No accounts, no sync, no lock-in."
   },
   "editor": {
-    "empty": "Select a note in the sidebar, or create a new page."
+    "empty": "Select a note in the sidebar, or create a new page.",
+    "externalEditMessage": "This note was edited outside Paperly.",
+    "conflictMessage": "This note was edited outside Paperly while you had unsaved changes.",
+    "reloadFromDisk": "Reload from disk",
+    "keepMyVersion": "Keep my version"
+  },
+  "search": {
+    "quickSwitcher": "Quick switcher",
+    "quickSwitcherHint": "Jump to a note by name",
+    "quickSwitcherPlaceholder": "Type to search notes...",
+    "fullText": "Search in vault",
+    "fullTextHint": "Search note contents",
+    "fullTextPlaceholder": "Search in all notes...",
+    "noResults": "No results found.",
+    "searching": "Searching...",
+    "matchCount": "{{count}} matches in {{ms}}ms",
+    "truncated": "truncated",
+    "error": "Search failed: {{message}}"
   },
   "agent": {
     "title": "Assistant",
     "placeholder": "The AI panel arrives in a later phase."
   },
   "settings": {
+    "title": "Settings",
     "theme": "Theme",
     "themeSystem": "System",
     "themeLight": "Light",

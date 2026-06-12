@@ -1,5 +1,5 @@
 /*
- * BlockNote themed by the noteflow tokens. Since 0.48 the editor reads its
+ * BlockNote themed by the Paperly tokens. Since 0.48 the editor reads its
  * CSS vars from .bn-root; both light and dark resolve through [data-theme],
  * so the editor follows the app theme with zero JS.
  */
