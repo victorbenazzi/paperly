@@ -213,6 +213,24 @@
     }
     .dl-meta a:hover { color: var(--ink); }
 
+    .hero-shot {
+      margin-top: 3.4rem;
+      border: 1px solid var(--hairline);
+      border-radius: 12px;
+      background: var(--surface);
+      overflow: hidden;
+      box-shadow:
+        0 1px 2px rgba(22, 24, 29, .05),
+        0 18px 48px -18px rgba(24, 102, 244, .18),
+        0 30px 80px -30px rgba(22, 24, 29, .22);
+    }
+
+    .hero-shot img {
+      display: block;
+      width: 100%;
+      height: auto;
+    }
+
     /* ── Install guide ──────────────────────────────────── */
     .guide {
       border-top: 1px solid var(--hairline);
@@ -228,6 +246,7 @@
     @media (max-width: 720px) {
       .guide-grid { grid-template-columns: 1fr; gap: 1.8rem; }
       .hero { padding: 5rem 0 4.5rem; }
+      .hero-shot { margin-top: 2.4rem; border-radius: 9px; }
       h1 {
         white-space: normal;
         text-wrap: balance;
@@ -386,6 +405,7 @@
       .rise:nth-child(3) { animation-delay: .23s; }
       .rise:nth-child(4) { animation-delay: .32s; }
       .rise:nth-child(5) { animation-delay: .41s; }
+      .rise:nth-child(6) { animation-delay: .5s; }
       @keyframes rise {
         to { opacity: 1; transform: none; }
       }
@@ -433,6 +453,16 @@
           <a id="dl-rpm" href="https://github.com/victorbenazzi/paperly/releases/latest">.rpm</a> ·
           <a href="https://github.com/victorbenazzi/paperly/releases" target="_blank" rel="noopener">todas as versões</a>
         </p>
+
+        <figure class="hero-shot rise">
+          <img
+            src="assets/paperly-screenshot.png"
+            alt="Janela do Paperly: editor de notas Markdown com a lista de pastas e notas na barra lateral"
+            width="2560"
+            height="1600"
+            decoding="async"
+          />
+        </figure>
       </div>
     </section>
 
