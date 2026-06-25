@@ -64,41 +64,46 @@ impl WatcherManager {
         let canonical_root = path.canonicalize().unwrap_or_else(|_| path.clone());
         // 80ms: snappy enough that agent-created files pop in immediately,
         // slow enough to coalesce editor-save churn.
-        let mut debouncer = new_debouncer(Duration::from_millis(80), move |res: DebounceEventResult| {
-            let events = match res {
-                Ok(events) => events,
-                Err(err) => {
-                    eprintln!("[watcher] error: {err}");
+        let mut debouncer = new_debouncer(
+            Duration::from_millis(80),
+            move |res: DebounceEventResult| {
+                let events = match res {
+                    Ok(events) => events,
+                    Err(err) => {
+                        eprintln!("[watcher] error: {err}");
+                        return;
+                    }
+                };
+                if events.is_empty() {
                     return;
                 }
-            };
-            if events.is_empty() {
-                return;
-            }
-            let mut paths: Vec<String> = events
-                .iter()
-                .map(|e| match e.path.strip_prefix(&canonical_root) {
-                    Ok(rel) => requested_root.join(rel).display().to_string(),
-                    Err(_) => e.path.display().to_string(),
-                })
-                // App-internal and tool dirs never drive the UI.
-                .filter(|p| {
-                    !p.contains("/.git/") && !p.contains("/.obsidian/") && !p.contains("/.paperly/")
-                })
-                .collect();
-            paths.sort();
-            paths.dedup();
-            if paths.is_empty() {
-                return;
-            }
-            let _ = app.emit(
-                EV_FS_CHANGED,
-                FsChangedPayload {
-                    vault_id: vid.clone(),
-                    paths,
-                },
-            );
-        })
+                let mut paths: Vec<String> = events
+                    .iter()
+                    .map(|e| match e.path.strip_prefix(&canonical_root) {
+                        Ok(rel) => requested_root.join(rel).display().to_string(),
+                        Err(_) => e.path.display().to_string(),
+                    })
+                    // App-internal and tool dirs never drive the UI.
+                    .filter(|p| {
+                        !p.contains("/.git/")
+                            && !p.contains("/.obsidian/")
+                            && !p.contains("/.paperly/")
+                    })
+                    .collect();
+                paths.sort();
+                paths.dedup();
+                if paths.is_empty() {
+                    return;
+                }
+                let _ = app.emit(
+                    EV_FS_CHANGED,
+                    FsChangedPayload {
+                        vault_id: vid.clone(),
+                        paths,
+                    },
+                );
+            },
+        )
         .map_err(|e| AppError::Other(format!("notify debouncer: {e}")))?;
 
         debouncer

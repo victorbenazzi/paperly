@@ -1,6 +1,6 @@
 //! Filesystem operations, all sandboxed to the registered vault roots.
-//! Every public function here calls `require_within_roots` before touching
-//! disk; if you add a new one, it MUST do the same.
+//! Public functions validate either the real existing path or the real parent
+//! directory before touching disk; if you add a new one, it MUST do the same.
 
 use std::fs;
 use std::path::Path;
@@ -99,6 +99,28 @@ fn require_within_roots(app: &AppHandle, path: &str) -> AppResult<()> {
     paths::ensure_within_roots(path, &roots)
 }
 
+fn require_existing_within_roots(app: &AppHandle, path: &str) -> AppResult<()> {
+    let cache = app.state::<Arc<VaultsCache>>();
+    let roots = cache.roots();
+    if roots.is_empty() {
+        return Err(AppError::PathNotAllowed(
+            "no vault roots registered yet".into(),
+        ));
+    }
+    paths::ensure_existing_within_roots(path, &roots)
+}
+
+fn require_parent_within_roots(app: &AppHandle, path: &str) -> AppResult<()> {
+    let cache = app.state::<Arc<VaultsCache>>();
+    let roots = cache.roots();
+    if roots.is_empty() {
+        return Err(AppError::PathNotAllowed(
+            "no vault roots registered yet".into(),
+        ));
+    }
+    paths::ensure_parent_within_roots(path, &roots)
+}
+
 fn refuse_vault_root(app: &AppHandle, path: &Path, action: &str) -> AppResult<()> {
     let normalized = paths::normalize(path);
     let cache = app.state::<Arc<VaultsCache>>();
@@ -157,7 +179,7 @@ fn bytes_to_text(bytes: Vec<u8>, truncated: bool, size: u64) -> TextFile {
 }
 
 pub fn read_dir(app: &AppHandle, path: &str) -> AppResult<Vec<DirEntry>> {
-    require_within_roots(app, path)?;
+    require_existing_within_roots(app, path)?;
     let read = fs::read_dir(Path::new(path)).map_err(|e| io_error("read_dir", e))?;
 
     let mut out: Vec<DirEntry> = Vec::with_capacity(64);
@@ -197,7 +219,7 @@ pub fn read_dir(app: &AppHandle, path: &str) -> AppResult<Vec<DirEntry>> {
 }
 
 pub fn stat(app: &AppHandle, path: &str) -> AppResult<FileMeta> {
-    require_within_roots(app, path)?;
+    require_existing_within_roots(app, path)?;
     let meta = Path::new(path)
         .symlink_metadata()
         .map_err(|e| io_error("stat", e))?;
@@ -210,17 +232,23 @@ pub fn stat(app: &AppHandle, path: &str) -> AppResult<FileMeta> {
 }
 
 pub fn read_file_text(app: &AppHandle, path: &str, max_bytes: Option<u64>) -> AppResult<TextFile> {
-    require_within_roots(app, path)?;
+    require_existing_within_roots(app, path)?;
     let limit = max_bytes.unwrap_or(DEFAULT_TEXT_LIMIT);
     let (bytes, truncated, size) = read_capped(path, "read_file_text", limit)?;
     Ok(bytes_to_text(bytes, truncated, size))
 }
 
-pub fn read_file_bytes(app: &AppHandle, path: &str, max_bytes: Option<u64>) -> AppResult<BytesFile> {
+pub fn read_file_bytes(
+    app: &AppHandle,
+    path: &str,
+    max_bytes: Option<u64>,
+) -> AppResult<BytesFile> {
     use base64::{engine::general_purpose::STANDARD, Engine as _};
-    require_within_roots(app, path)?;
+    require_existing_within_roots(app, path)?;
     let limit = max_bytes.unwrap_or(DEFAULT_BYTES_LIMIT);
-    let meta = Path::new(path).metadata().map_err(|e| io_error("read_file_bytes", e))?;
+    let meta = Path::new(path)
+        .metadata()
+        .map_err(|e| io_error("read_file_bytes", e))?;
     if meta.len() > limit {
         return Err(AppError::FileTooLarge(format!(
             "{path}: {} bytes (max {limit})",
@@ -273,13 +301,23 @@ pub fn save_asset(
     };
     let slug: String = stem
         .chars()
-        .map(|c| if c.is_alphanumeric() { c.to_ascii_lowercase() } else { '-' })
+        .map(|c| {
+            if c.is_alphanumeric() {
+                c.to_ascii_lowercase()
+            } else {
+                '-'
+            }
+        })
         .collect::<String>()
         .trim_matches('-')
         .chars()
         .take(40)
         .collect();
-    let slug = if slug.is_empty() { "asset".to_string() } else { slug };
+    let slug = if slug.is_empty() {
+        "asset".to_string()
+    } else {
+        slug
+    };
     let suffix: String = uuid::Uuid::new_v4()
         .to_string()
         .replace('-', "")
@@ -292,14 +330,14 @@ pub fn save_asset(
     fs::create_dir_all(&assets_dir).map_err(|e| io_error("save_asset: mkdir", e))?;
     let target = assets_dir.join(&name);
     let target_str = target.to_string_lossy().to_string();
-    require_within_roots(app, &target_str)?;
+    require_parent_within_roots(app, &target_str)?;
     atomic_write(&target, &bytes)?;
     Ok(format!("assets/{name}"))
 }
 
 /// Atomic write: `<path>.<ext>.paperly.tmp` then rename.
 pub fn write_file_text(app: &AppHandle, path: &str, content: &str) -> AppResult<()> {
-    require_within_roots(app, path)?;
+    require_parent_within_roots(app, path)?;
     atomic_write(Path::new(path), content.as_bytes())
 }
 
@@ -317,45 +355,33 @@ pub fn atomic_write(path: &Path, bytes: &[u8]) -> AppResult<()> {
 }
 
 /// Validate a user-supplied name component used for create/rename.
-/// Allows nested segments (`a/b/c`) for create, but rejects traversal and
-/// absolute/empty inputs.
-fn validate_relative_name(name: &str, allow_nested: bool) -> AppResult<()> {
+/// Reject traversal, separators and absolute/empty inputs.
+fn validate_name(name: &str) -> AppResult<()> {
     if name.is_empty() || name == "." || name == ".." {
         return Err(AppError::Other(format!("invalid name: {name:?}")));
     }
     if name.contains('\0') || name.starts_with('/') || name.starts_with('\\') {
         return Err(AppError::Other(format!("invalid name: {name:?}")));
     }
-    if !allow_nested && (name.contains('/') || name.contains('\\')) {
+    if name.contains('/') || name.contains('\\') {
         return Err(AppError::Other(format!(
             "invalid name (no separators allowed): {name:?}"
         )));
     }
-    for seg in name.split(['/', '\\']) {
-        if seg == ".." || seg == "." {
-            return Err(AppError::Other(format!(
-                "invalid name (traversal not allowed): {name:?}"
-            )));
-        }
-    }
     Ok(())
 }
 
-/// Create an empty file `name` inside `parent`. `name` may be nested;
-/// intermediate directories are created. Refuses to overwrite.
+/// Create an empty file `name` inside `parent`. Refuses to overwrite.
 pub fn create_file(app: &AppHandle, parent: &str, name: &str) -> AppResult<String> {
-    require_within_roots(app, parent)?;
-    validate_relative_name(name, true)?;
+    require_existing_within_roots(app, parent)?;
+    validate_name(name)?;
 
     let target = Path::new(parent).join(name);
     let target_str = target.to_string_lossy().to_string();
-    require_within_roots(app, &target_str)?;
+    require_parent_within_roots(app, &target_str)?;
 
     if target.symlink_metadata().is_ok() {
         return Err(AppError::Other(format!("already exists: {target_str}")));
-    }
-    if let Some(dir) = target.parent() {
-        fs::create_dir_all(dir).map_err(|e| io_error("create_file: mkdir parents", e))?;
     }
     // Create exclusively so a race can't clobber an existing file.
     use std::fs::OpenOptions;
@@ -369,12 +395,12 @@ pub fn create_file(app: &AppHandle, parent: &str, name: &str) -> AppResult<Strin
 
 /// Create directory `name` inside `parent`. Refuses if the leaf already exists.
 pub fn create_dir(app: &AppHandle, parent: &str, name: &str) -> AppResult<String> {
-    require_within_roots(app, parent)?;
-    validate_relative_name(name, true)?;
+    require_existing_within_roots(app, parent)?;
+    validate_name(name)?;
 
     let target = Path::new(parent).join(name);
     let target_str = target.to_string_lossy().to_string();
-    require_within_roots(app, &target_str)?;
+    require_parent_within_roots(app, &target_str)?;
 
     if target.symlink_metadata().is_ok() {
         return Err(AppError::Other(format!("already exists: {target_str}")));
@@ -386,7 +412,7 @@ pub fn create_dir(app: &AppHandle, parent: &str, name: &str) -> AppResult<String
 /// Move a file or folder to the macOS Trash (recoverable). Notes are user
 /// data: never permanently delete from the UI.
 pub fn delete_path(app: &AppHandle, path: &str) -> AppResult<()> {
-    require_within_roots(app, path)?;
+    require_existing_within_roots(app, path)?;
     let target = Path::new(path);
     refuse_vault_root(app, target, "delete")?;
     target
@@ -398,21 +424,25 @@ pub fn delete_path(app: &AppHandle, path: &str) -> AppResult<()> {
 
 /// Rename within the same parent directory. `new_name` is a basename.
 pub fn rename_path(app: &AppHandle, from: &str, new_name: &str) -> AppResult<String> {
-    require_within_roots(app, from)?;
-    validate_relative_name(new_name, false)?;
+    require_existing_within_roots(app, from)?;
+    validate_name(new_name)?;
 
     let from_path = Path::new(from);
     refuse_vault_root(app, from_path, "rename")?;
 
     let parent = from_path.parent().ok_or_else(|| {
-        AppError::Other(format!("cannot rename top-level path without parent: {from}"))
+        AppError::Other(format!(
+            "cannot rename top-level path without parent: {from}"
+        ))
     })?;
     let to_path = parent.join(new_name);
     let to_str = to_path.to_string_lossy().to_string();
-    require_within_roots(app, &to_str)?;
+    require_parent_within_roots(app, &to_str)?;
 
     if to_path.symlink_metadata().is_ok() {
-        return Err(AppError::Other(format!("destination already exists: {to_str}")));
+        return Err(AppError::Other(format!(
+            "destination already exists: {to_str}"
+        )));
     }
 
     fs::rename(from_path, &to_path).map_err(|e| io_error("rename", e))?;
@@ -452,8 +482,8 @@ fn ensure_is_dir(path: &Path, ctx: &str) -> AppResult<()> {
 /// Move `from` into directory `to_dir`, preserving the basename.
 /// Refuses no-ops, circular moves and conflicts.
 pub fn move_path(app: &AppHandle, from: &str, to_dir: &str) -> AppResult<String> {
-    require_within_roots(app, from)?;
-    require_within_roots(app, to_dir)?;
+    require_existing_within_roots(app, from)?;
+    require_existing_within_roots(app, to_dir)?;
 
     let from_path = Path::new(from);
     refuse_vault_root(app, from_path, "move")?;
@@ -478,10 +508,12 @@ pub fn move_path(app: &AppHandle, from: &str, to_dir: &str) -> AppResult<String>
 
     let dest = to_dir_path.join(base);
     let dest_str = dest.to_string_lossy().to_string();
-    require_within_roots(app, &dest_str)?;
+    require_parent_within_roots(app, &dest_str)?;
 
     if dest.symlink_metadata().is_ok() {
-        return Err(AppError::Other(format!("destination already exists: {dest_str}")));
+        return Err(AppError::Other(format!(
+            "destination already exists: {dest_str}"
+        )));
     }
     ensure_is_dir(to_dir_path, "move: dest dir")?;
 

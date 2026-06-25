@@ -30,6 +30,10 @@ export const CMD = {
   readFileBytes: "read_file_bytes",
   vaultSaveAsset: "vault_save_asset",
   openWithDefaultApp: "open_with_default_app",
+  // pages
+  renamePage: "rename_page",
+  movePage: "move_page",
+  deletePage: "delete_page",
   // workspace
   saveWorkspaceState: "save_workspace_state",
   loadWorkspaceState: "load_workspace_state",
@@ -44,13 +48,13 @@ export const CMD = {
 export type CmdName = (typeof CMD)[keyof typeof CMD];
 
 /** Plain-browser dev (vite without Tauri): route IPC to the in-memory mock. */
-const useMock = import.meta.env.DEV && !("__TAURI_INTERNALS__" in window);
+export const usingMockIpc = import.meta.env.DEV && !("__TAURI_INTERNALS__" in window);
 
 export async function ipc<T = unknown>(
   cmd: CmdName,
   args?: Record<string, unknown>,
 ): Promise<T> {
-  if (useMock) return (await import("./ipc.mock")).mockIpc<T>(cmd, args);
+  if (usingMockIpc) return (await import("./ipc.mock")).mockIpc<T>(cmd, args);
   return tauriInvoke<T>(cmd, args);
 }
 
@@ -128,6 +132,11 @@ export interface BytesFile {
   mime: string | null;
   truncated: boolean;
   size: number;
+}
+
+export interface PagePaths {
+  path: string;
+  dirPath: string | null;
 }
 
 export interface SearchOptions {

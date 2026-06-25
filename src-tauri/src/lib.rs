@@ -67,6 +67,10 @@ pub fn run() {
             commands::filesystem::read_file_bytes,
             commands::filesystem::vault_save_asset,
             commands::filesystem::open_with_default_app,
+            // pages
+            commands::pages::rename_page,
+            commands::pages::move_page,
+            commands::pages::delete_page,
             // workspace
             commands::workspace::save_workspace_state,
             commands::workspace::load_workspace_state,

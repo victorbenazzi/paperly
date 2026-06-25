@@ -122,7 +122,9 @@ pub fn read_json_backed<T: DeserializeOwned + Default>(path: &Path) -> AppResult
             Err(e) => {
                 let backup = path.with_file_name(format!(
                     "{}.corrupt",
-                    path.file_name().and_then(|s| s.to_str()).unwrap_or("config")
+                    path.file_name()
+                        .and_then(|s| s.to_str())
+                        .unwrap_or("config")
                 ));
                 eprintln!(
                     "[paperly] config parse failed for {}: {e}; moving it to {} and using defaults",
@@ -191,7 +193,10 @@ fn tmp_path(path: &Path) -> PathBuf {
     use std::sync::atomic::{AtomicU64, Ordering};
     static COUNTER: AtomicU64 = AtomicU64::new(0);
     let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-    let file_name = path.file_name().and_then(|s| s.to_str()).unwrap_or("config");
+    let file_name = path
+        .file_name()
+        .and_then(|s| s.to_str())
+        .unwrap_or("config");
     path.with_file_name(format!(
         "{file_name}.paperly.tmp.{}.{n}",
         std::process::id()

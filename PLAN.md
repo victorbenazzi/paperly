@@ -102,12 +102,12 @@ pnpm add @tauri-apps/api @tauri-apps/plugin-dialog @tauri-apps/plugin-os @tauri-
 ```
 Cargo: `tauri@2`, plugins `single-instance/dialog/os/process`, `serde(_json)`, `thiserror`, `tokio(full)`, `parking_lot`, `uuid`, `chrono`, `dirs`, `which`. Pinar versões exatas no primeiro commit.
 `tauri.conf.json`: identifier `com.paperly.app`, `titleBarStyle: "Overlay"` + `hiddenTitle: true`, min 880×560, `security.csp: null`, porta 1420.
-Portar: `error.rs`, `config_paths.rs` (PAPERLY_HOME), `util/paths.rs`. tokens.css completo. `theme.store` (localStorage no module load, sem FOUC, matchMedia) + i18n en/pt-BR no module load. TitleBar com `data-tauri-drag-region` em CADA elemento do click path. Shell 3 colunas (sidebar | editor | painel IA colapsado). Script `scripts/check-no-emdash.sh` (grep `—`/`–` em src/) no `pnpm build`.
+Portar: `error.rs`, `config_paths.rs` (PAPERLY_HOME), `util/paths.rs`. tokens.css completo. `theme.store` (localStorage no module load, sem FOUC, matchMedia) + i18n en/pt-BR no module load. TitleBar com `data-tauri-drag-region` em CADA elemento do click path. Shell 3 colunas (sidebar | editor | painel IA colapsado). Script `scripts/check-no-emdash.sh` (grep de pontuação proibida em texto do repo) no `pnpm build`.
 **Verificar**: janela abre e arrasta pela titlebar; toggle light/dark sem flash e persiste; pt-BR persiste; `PAPERLY_HOME=~/.paperly-dev` cria árvore isolada; grep de em-dash vazio.
 
 ### Fase 1: Vaults + árvore + CRUD
 Comandos (todos FS com `ensure_within_roots`; roots = vaults do `VaultsCache`):
-`vault_list/add/create/remove/rename/set_active`, `read_dir`, `stat`, `read_file_text`, `write_file_text`, `create_file` (anti-colisão "Untitled 2.md"), `create_dir`, `rename_path`, `delete_path` (→ Lixeira via `trash`), `move_path`, `reveal_in_finder`, `save/load_workspace_state`.
+`vault_list/add/create/remove/rename/set_active`, `read_dir`, `stat`, `read_file_text`, `write_file_text`, `create_file` (anti-colisão "Untitled 2.md"), `create_dir`, `rename_path`, `delete_path` (Lixeira via `trash`), `move_path`, `reveal_in_finder`, `save/load_workspace_state`.
 Stores: `vaults.store`, `tree.store` (dirCache, expanded, seleção, merge folder-note, inline rename/create), `nav.store` (openPath + histórico).
 UI: WelcomeScreen sem vault; dropdown de vault no topo da sidebar; árvore Notion-style (hover revela + e ⋯); context menu; drag-move com POINTER EVENTS (nunca HTML5 drag, WKWebView quebra com Radix Slots). Painel central provisório: `<pre>` do texto cru.
 **Verificar**: registrar vault com .md existentes; criar/renomear/mover/deletar refletem no Finder; deletar vai pra Lixeira; `ipc(CMD.readFileText, {path:"/etc/hosts"})` → `{code:"PathNotAllowed"}`; restart preserva vault ativo + expansão.

@@ -65,11 +65,12 @@ pub async fn vault_save_asset(
 pub async fn open_with_default_app(path: String, app: AppHandle) -> AppResult<()> {
     use std::sync::Arc;
     use tauri::Manager;
+    use tauri_plugin_opener::OpenerExt;
+
     let cache = app.state::<Arc<crate::vaults::VaultsCache>>();
-    crate::util::paths::ensure_within_roots(&path, &cache.roots())?;
-    std::process::Command::new("open")
-        .arg(&path)
-        .spawn()
+    crate::util::paths::ensure_existing_within_roots(&path, &cache.roots())?;
+    app.opener()
+        .open_path(&path, None::<&str>)
         .map_err(|e| crate::error::AppError::Other(format!("open: {e}")))?;
     Ok(())
 }
@@ -105,13 +106,12 @@ pub async fn move_path(path: String, target_dir: String, app: AppHandle) -> AppR
 pub async fn reveal_in_finder(path: String, app: AppHandle) -> AppResult<()> {
     use std::sync::Arc;
     use tauri::Manager;
-    // Reveal is read-only, but keep it sandboxed anyway.
+    use tauri_plugin_opener::OpenerExt;
+
     let cache = app.state::<Arc<crate::vaults::VaultsCache>>();
-    crate::util::paths::ensure_within_roots(&path, &cache.roots())?;
-    std::process::Command::new("open")
-        .arg("-R")
-        .arg(&path)
-        .spawn()
+    crate::util::paths::ensure_existing_within_roots(&path, &cache.roots())?;
+    app.opener()
+        .reveal_item_in_dir(&path)
         .map_err(|e| crate::error::AppError::Other(format!("reveal: {e}")))?;
     Ok(())
 }

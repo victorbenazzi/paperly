@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-import { CMD, ipc, type DirEntry } from "@/lib/ipc";
+import { CMD, ipc, type DirEntry, type PagePaths } from "@/lib/ipc";
 import { isMarkdown, stripMdExt } from "./tree.types";
 
 /**
@@ -48,7 +48,7 @@ interface TreeState {
 
   createNote: (parentDir: string, baseName: string) => Promise<string>;
   createFolder: (parentDir: string, name: string) => Promise<string>;
-  /** Rename a page: renames `X.md` and, for folder notes, the companion `X/`. */
+  /** Rename a page through the backend page command so `X.md` and `X/` stay together. */
   renameNode: (
     path: string,
     dirPath: string | null,
@@ -223,23 +223,16 @@ export const useTreeStore = create<TreeState>((set, get) => ({
   renameNode: async (path, dirPath, newDisplayName) => {
     const isNote = isMarkdown(path.split("/").pop() ?? "");
     const newName = isNote ? `${newDisplayName}.md` : newDisplayName;
-    const newPath = await ipc<string>(CMD.renamePath, { path, newName });
-    // Folder note: keep the companion folder in lockstep. Best-effort rollback
-    // of the first rename if the second fails, so the pair never dessyncs.
-    if (dirPath && isNote) {
-      try {
-        await ipc<string>(CMD.renamePath, { path: dirPath, newName: newDisplayName });
-      } catch (err) {
-        const oldName = path.split("/").pop()!;
-        await ipc<string>(CMD.renamePath, { path: newPath, newName: oldName }).catch(() => {});
-        throw err;
-      }
-    }
+    const page =
+      isNote
+        ? await ipc<PagePaths>(CMD.renamePage, { path, dirPath, newDisplayName })
+        : { path: await ipc<string>(CMD.renamePath, { path, newName }), dirPath: null };
+    const newPath = page.path;
     set((s) => {
       let order = renameInOrder(s.order, parentOf(path), displayNameOf(path), newDisplayName);
-      // Folder (or folder-note companion) renamed: re-key the orders beneath it.
       const oldDir = isNote ? dirPath : path;
-      if (oldDir) order = remapOrderDirs(order, oldDir, isNote ? stripMdExt(newPath) : newPath);
+      const newDir = isNote ? page.dirPath : newPath;
+      if (oldDir && newDir) order = remapOrderDirs(order, oldDir, newDir);
       return { order };
     });
     await get().invalidateDirs([parentOf(path)]);
@@ -247,10 +240,9 @@ export const useTreeStore = create<TreeState>((set, get) => ({
   },
 
   deleteNode: async (path, dirPath) => {
-    await ipc(CMD.deletePath, { path });
-    if (dirPath && dirPath !== path) {
-      await ipc(CMD.deletePath, { path: dirPath }).catch(() => {});
-    }
+    const isNote = isMarkdown(path.split("/").pop() ?? "");
+    if (isNote) await ipc(CMD.deletePage, { path, dirPath });
+    else await ipc(CMD.deletePath, { path });
     set((s) => {
       let order = dropFromOrder(s.order, parentOf(path), displayNameOf(path));
       if (dirPath) order = remapOrderDirs(order, dirPath, null);
@@ -261,22 +253,15 @@ export const useTreeStore = create<TreeState>((set, get) => ({
   },
 
   moveNode: async (path, dirPath, targetDir) => {
-    const newPath = await ipc<string>(CMD.movePath, { path, targetDir });
-    if (dirPath && dirPath !== path) {
-      try {
-        await ipc<string>(CMD.movePath, { path: dirPath, targetDir });
-      } catch (err) {
-        await ipc<string>(CMD.movePath, { path: newPath, targetDir: parentOf(path) }).catch(
-          () => {},
-        );
-        throw err;
-      }
-    }
+    const isNote = isMarkdown(path.split("/").pop() ?? "");
+    const page =
+      isNote
+        ? await ipc<PagePaths>(CMD.movePage, { path, dirPath, targetDir })
+        : { path: await ipc<string>(CMD.movePath, { path, targetDir }), dirPath: null };
+    const newPath = page.path;
     set((s) => {
       let order = dropFromOrder(s.order, parentOf(path), displayNameOf(path));
-      if (dirPath) {
-        order = remapOrderDirs(order, dirPath, `${targetDir}/${dirPath.split("/").pop()!}`);
-      }
+      if (dirPath && page.dirPath) order = remapOrderDirs(order, dirPath, page.dirPath);
       return { order };
     });
     await get().invalidateDirs([parentOf(path), targetDir]);

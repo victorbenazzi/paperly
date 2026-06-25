@@ -169,7 +169,10 @@ pub fn create(app: &AppHandle, directory: String, name: String) -> AppResult<Vau
     }
     let full = std::path::Path::new(&directory).join(&name);
     if full.exists() {
-        return Err(AppError::Other(format!("already exists: {}", full.display())));
+        return Err(AppError::Other(format!(
+            "already exists: {}",
+            full.display()
+        )));
     }
     std::fs::create_dir(&full).map_err(|e| AppError::Other(format!("create vault dir: {e}")))?;
     add(app, full.to_string_lossy().into_owned())
@@ -216,7 +219,10 @@ pub fn rename(app: &AppHandle, id: &str, name: String) -> AppResult<Vault> {
             .ok_or_else(|| AppError::Other("vault has no parent directory".into()))?;
         let new_path = parent.join(&trimmed);
         if new_path.exists() {
-            return Err(AppError::Other(format!("already exists: {}", new_path.display())));
+            return Err(AppError::Other(format!(
+                "already exists: {}",
+                new_path.display()
+            )));
         }
         std::fs::rename(&old_path, &new_path)
             .map_err(|e| AppError::Other(format!("rename vault dir: {e}")))?;

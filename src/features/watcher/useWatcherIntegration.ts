@@ -10,6 +10,7 @@ import { useExternalEditStore } from "@/features/editor/externalEdit.store";
 import { useVaultsStore } from "@/features/vaults/vaults.store";
 import { refreshWikiIndex } from "@/features/editor/markdown/wikiLinks";
 import { isMarkdown } from "@/features/tree/tree.types";
+import { invalidateFileUrls } from "@/features/assets/assets";
 
 /**
  * Wires the Rust watcher's `fs://changed` events into the frontend:
@@ -42,6 +43,7 @@ export function useWatcherIntegration(vaultId: string | null) {
       if (paths.some((p) => isMarkdown(p.split("/").pop() ?? ""))) {
         refreshWikiIndex(eventVaultId);
       }
+      invalidateFileUrls(paths);
 
       const editorState = useEditorStore.getState();
       const openPath = editorState.path;

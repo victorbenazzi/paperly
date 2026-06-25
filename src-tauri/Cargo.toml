@@ -1,6 +1,6 @@
 [package]
 name = "paperly"
-version = "0.2.0"
+version = "0.2.1"
 description = "Paperly"
 authors = ["you"]
 edition = "2021"
@@ -42,4 +42,3 @@ ignore = "0.4.26"
 grep-searcher = "0.1.16"
 grep-regex = "0.1.14"
 grep-matcher = "0.1.8"
-

@@ -34,10 +34,13 @@ function EmptyNoteHint() {
 }
 
 export function AppShell() {
+  const { t } = useTranslation();
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
   const sidebarWidth = useUiStore((s) => s.sidebarWidth);
   const agentPanelOpen = useUiStore((s) => s.agentPanelOpen);
   const hydrate = useVaultsStore((s) => s.hydrate);
+  const hydrated = useVaultsStore((s) => s.hydrated);
+  const vaultError = useVaultsStore((s) => s.error);
   const activeVaultId = useVaultsStore((s) => s.activeVaultId);
   const vault = useVaultsStore((s) => activeVault(s));
   const openPath = useNavStore((s) => s.openPath);
@@ -85,7 +88,13 @@ export function AppShell() {
         <ExternalEditBanner />
         <OutlineRail />
         <div data-scroll-root className="min-h-0 flex-1 overflow-auto">
-          {openPath ? (
+          {!hydrated ? null : vaultError ? (
+            <div className="flex h-full items-center justify-center px-8">
+              <p className="text-center text-sm text-danger">
+                {t("errors.generic", { message: vaultError })}
+              </p>
+            </div>
+          ) : openPath ? (
             isMarkdown(openPath.split("/").pop() ?? "") ? (
               <NoteEditor key={openPath} path={openPath} />
             ) : IMAGE_EXTS.has(openPath.split(".").pop()?.toLowerCase() ?? "") ? (

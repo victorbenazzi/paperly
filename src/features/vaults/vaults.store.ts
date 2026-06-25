@@ -1,12 +1,13 @@
 import { create } from "zustand";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 
-import { CMD, errorMessage, ipc, type Vault, type VaultsFile } from "@/lib/ipc";
+import { CMD, errorMessage, ipc, usingMockIpc, type Vault, type VaultsFile } from "@/lib/ipc";
 
 interface VaultsState {
   vaults: Vault[];
   activeVaultId: string | null;
   hydrated: boolean;
+  error: string | null;
 
   hydrate: () => Promise<void>;
   /** Open the native folder picker and register the chosen folder. */
@@ -35,21 +36,38 @@ export const useVaultsStore = create<VaultsState>((set, get) => ({
   vaults: [],
   activeVaultId: null,
   hydrated: false,
+  error: null,
 
   hydrate: async () => {
-    const file = await ipc<VaultsFile>(CMD.vaultList);
-    // The file may carry no active id (or a dangling one) while vaults still
-    // exist; fall back so onboarding only ever shows with zero vaults.
-    const active =
-      file.vaults.find((v) => v.id === file.lastActiveVaultId) ?? mostRecentVault(file.vaults);
-    set({
-      vaults: file.vaults,
-      activeVaultId: active?.id ?? null,
-      hydrated: true,
-    });
+    try {
+      const file = await ipc<VaultsFile>(CMD.vaultList);
+      // The file may carry no active id (or a dangling one) while vaults still
+      // exist; fall back so onboarding only ever shows with zero vaults.
+      const active =
+        file.vaults.find((v) => v.id === file.lastActiveVaultId) ?? mostRecentVault(file.vaults);
+      set({
+        vaults: file.vaults,
+        activeVaultId: active?.id ?? null,
+        hydrated: true,
+        error: null,
+      });
+    } catch (err) {
+      set({
+        vaults: [],
+        activeVaultId: null,
+        hydrated: true,
+        error: errorMessage(err),
+      });
+    }
   },
 
   addViaDialog: async () => {
+    if (usingMockIpc) {
+      const vault = await ipc<Vault>(CMD.vaultAdd, { path: "/vault" });
+      const existing = get().vaults.filter((v) => v.id !== vault.id);
+      set({ vaults: [...existing, vault], activeVaultId: vault.id });
+      return vault;
+    }
     const picked = await openDialog({ directory: true, multiple: false });
     if (!picked || typeof picked !== "string") return null;
     const vault = await ipc<Vault>(CMD.vaultAdd, { path: picked });
@@ -59,6 +77,12 @@ export const useVaultsStore = create<VaultsState>((set, get) => ({
   },
 
   createViaDialog: async (baseName) => {
+    if (usingMockIpc) {
+      const vault = await ipc<Vault>(CMD.vaultCreate, { directory: "/", name: baseName });
+      const existing = get().vaults.filter((v) => v.id !== vault.id);
+      set({ vaults: [...existing, vault], activeVaultId: vault.id });
+      return vault;
+    }
     const picked = await openDialog({ directory: true, multiple: false });
     if (!picked || typeof picked !== "string") return null;
     let vault: Vault | null = null;

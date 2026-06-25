@@ -1,4 +1,5 @@
 pub mod filesystem;
+pub mod pages;
 pub mod search;
 pub mod settings;
 pub mod vaults;

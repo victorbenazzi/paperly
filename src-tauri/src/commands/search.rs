@@ -22,7 +22,11 @@ pub async fn search_in_vault(
 }
 
 #[tauri::command]
-pub async fn list_files(vault_id: String, max: Option<usize>, app: AppHandle) -> AppResult<Vec<String>> {
+pub async fn list_files(
+    vault_id: String,
+    max: Option<usize>,
+    app: AppHandle,
+) -> AppResult<Vec<String>> {
     let root = app.state::<Arc<VaultsCache>>().require_path(&vault_id)?;
     tauri::async_runtime::spawn_blocking(move || search::list_files(&root, max.unwrap_or(5000)))
         .await

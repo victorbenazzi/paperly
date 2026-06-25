@@ -212,7 +212,10 @@ impl grep_searcher::Sink for CollectSink<'_> {
         // Byte offsets of the first match, converted to UTF-16 code units so
         // the frontend can highlight by slicing line_text directly.
         let (start, end) = match self.matcher.find(bytes) {
-            Ok(Some(m)) => (byte_to_utf16(bytes, m.start()), byte_to_utf16(bytes, m.end())),
+            Ok(Some(m)) => (
+                byte_to_utf16(bytes, m.start()),
+                byte_to_utf16(bytes, m.end()),
+            ),
             _ => (0, 0),
         };
 
@@ -229,5 +232,7 @@ impl grep_searcher::Sink for CollectSink<'_> {
 
 fn byte_to_utf16(bytes: &[u8], byte_offset: usize) -> u32 {
     let upto = byte_offset.min(bytes.len());
-    String::from_utf8_lossy(&bytes[..upto]).encode_utf16().count() as u32
+    String::from_utf8_lossy(&bytes[..upto])
+        .encode_utf16()
+        .count() as u32
 }

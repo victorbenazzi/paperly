@@ -11,7 +11,7 @@ use crate::watcher::SharedWatcher;
 #[tauri::command]
 pub async fn watcher_watch(vault_id: String, path: String, app: AppHandle) -> AppResult<()> {
     let cache = app.state::<Arc<VaultsCache>>();
-    paths::ensure_within_roots(&path, &cache.roots())?;
+    paths::ensure_existing_within_roots(&path, &cache.roots())?;
     let manager = app.state::<SharedWatcher>();
     manager.watch(vault_id, PathBuf::from(path))
 }

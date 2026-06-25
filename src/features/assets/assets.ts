@@ -29,6 +29,15 @@ export function invalidateFileUrl(absPath: string) {
   void cached?.then((url) => URL.revokeObjectURL(url)).catch(() => {});
 }
 
+/** Drop cached URLs for exact paths or directories reported by the watcher. */
+export function invalidateFileUrls(paths: string[]) {
+  for (const key of [...urlCache.keys()]) {
+    if (paths.some((p) => key === p || key.startsWith(`${p}/`))) {
+      invalidateFileUrl(key);
+    }
+  }
+}
+
 /**
  * BlockNote `uploadFile`: pasted/dropped bytes go to `<vault>/assets/` and the
  * block keeps the VAULT-RELATIVE path (`assets/x.png`), which is exactly what
