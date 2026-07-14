@@ -23,18 +23,15 @@ function readStoredWidth(): number {
 interface UiState {
   sidebarOpen: boolean;
   sidebarWidth: number;
-  agentPanelOpen: boolean;
   settingsOpen: boolean;
   toggleSidebar: () => void;
   setSidebarWidth: (width: number) => void;
-  toggleAgentPanel: () => void;
   setSettingsOpen: (open: boolean) => void;
 }
 
 export const useUiStore = create<UiState>((set) => ({
   sidebarOpen: true,
   sidebarWidth: readStoredWidth(),
-  agentPanelOpen: false,
   settingsOpen: false,
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
   setSidebarWidth: (width) => {
@@ -46,6 +43,5 @@ export const useUiStore = create<UiState>((set) => ({
     }
     set({ sidebarWidth: clamped });
   },
-  toggleAgentPanel: () => set((s) => ({ agentPanelOpen: !s.agentPanelOpen })),
   setSettingsOpen: (open) => set({ settingsOpen: open }),
 }));

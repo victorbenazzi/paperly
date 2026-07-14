@@ -1,6 +1,12 @@
 import { create } from "zustand";
 
-import { CMD, ipc, type DirEntry, type PagePaths } from "@/lib/ipc";
+import {
+  CMD,
+  ipc,
+  type DeletePageOutcome,
+  type DirEntry,
+  type PagePaths,
+} from "@/lib/ipc";
 import { isMarkdown, stripMdExt } from "./tree.types";
 
 /**
@@ -54,7 +60,7 @@ interface TreeState {
     dirPath: string | null,
     newDisplayName: string,
   ) => Promise<string>;
-  deleteNode: (path: string, dirPath: string | null) => Promise<void>;
+  deleteNode: (path: string, dirPath: string | null) => Promise<DeletePageOutcome>;
   moveNode: (path: string, dirPath: string | null, targetDir: string) => Promise<string>;
 }
 
@@ -241,15 +247,21 @@ export const useTreeStore = create<TreeState>((set, get) => ({
 
   deleteNode: async (path, dirPath) => {
     const isNote = isMarkdown(path.split("/").pop() ?? "");
-    if (isNote) await ipc(CMD.deletePage, { path, dirPath });
-    else await ipc(CMD.deletePath, { path });
+    const outcome = isNote
+      ? await ipc<DeletePageOutcome>(CMD.deletePage, { path, dirPath })
+      : await ipc(CMD.deletePath, { path }).then(
+          () => ({ kind: "deleted", deletedPaths: [path] }) as DeletePageOutcome,
+        );
+    const deletedPaths = outcome.kind === "failed" ? [] : outcome.deletedPaths;
+    if (deletedPaths.length === 0) return outcome;
     set((s) => {
       let order = dropFromOrder(s.order, parentOf(path), displayNameOf(path));
-      if (dirPath) order = remapOrderDirs(order, dirPath, null);
+      if (dirPath && deletedPaths.includes(dirPath)) order = remapOrderDirs(order, dirPath, null);
       return { order };
     });
     await get().invalidateDirs([parentOf(path)]);
-    if (get().selectedPath === path) set({ selectedPath: null });
+    if (deletedPaths.includes(path) && get().selectedPath === path) set({ selectedPath: null });
+    return outcome;
   },
 
   moveNode: async (path, dirPath, targetDir) => {

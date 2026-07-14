@@ -1,14 +1,13 @@
 import { useTranslation } from "react-i18next";
-import { MoreHorizontal, Settings, Sparkles, Trash2 } from "lucide-react";
+import { MoreHorizontal, Settings, Trash2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import { CMD, errorMessage, ipc } from "@/lib/ipc";
+import { CMD, ipc } from "@/lib/ipc";
 import { isMarkdown, stripMdExt } from "@/features/tree/tree.types";
 import { useUiStore } from "@/features/ui/ui.store";
 import { useVaultsStore, activeVault } from "@/features/vaults/vaults.store";
 import { useNavStore } from "@/features/nav/nav.store";
-import { useTreeStore } from "@/features/tree/tree.store";
-import { closeDeletedPaths } from "@/features/pages/pagePaths";
+import { deletePageFlow } from "@/features/pages/deletePageFlow";
 import { Button } from "@/components/ui/button";
 import { Breadcrumb } from "@/components/layout/Breadcrumb";
 import { UpdatePill } from "@/components/updates/UpdatePill";
@@ -20,15 +19,14 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { SaveStatusIndicator } from "@/components/editor/SaveStatusIndicator";
 
 export function MainHeader() {
   const { t } = useTranslation();
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
   const vault = useVaultsStore((s) => activeVault(s));
-  const toggleAgentPanel = useUiStore((s) => s.toggleAgentPanel);
   const setSettingsOpen = useUiStore((s) => s.setSettingsOpen);
   const openPath = useNavStore((s) => s.openPath);
-  const deleteNode = useTreeStore((s) => s.deleteNode);
 
   const reveal = () => {
     if (openPath) void ipc(CMD.revealInFinder, { path: openPath }).catch(() => {});
@@ -41,12 +39,7 @@ export function MainHeader() {
     const dirPath = isMarkdown(name)
       ? openPath.slice(0, openPath.length - name.length) + stripMdExt(name)
       : null;
-    try {
-      closeDeletedPaths(openPath, dirPath);
-      await deleteNode(openPath, dirPath);
-    } catch (err) {
-      console.error("delete failed:", errorMessage(err));
-    }
+    await deletePageFlow(openPath, dirPath);
   };
 
   return (
@@ -61,6 +54,7 @@ export function MainHeader() {
       <Breadcrumb />
       <div data-tauri-drag-region className="min-w-0 flex-1" />
 
+      <SaveStatusIndicator />
       <UpdatePill />
 
       {openPath ? (
@@ -91,22 +85,7 @@ export function MainHeader() {
         </DropdownMenu>
       ) : null}
 
-      {vault ? (
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={t("titlebar.toggleAgent")}
-              onClick={toggleAgentPanel}
-              className="text-ink-muted hover:text-ink"
-            >
-              <Sparkles size={16} />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent side="bottom">{t("titlebar.toggleAgent")}</TooltipContent>
-        </Tooltip>
-      ) : (
+      {!vault ? (
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
@@ -121,7 +100,7 @@ export function MainHeader() {
           </TooltipTrigger>
           <TooltipContent side="bottom">{t("settings.title")}</TooltipContent>
         </Tooltip>
-      )}
+      ) : null}
     </header>
   );
 }

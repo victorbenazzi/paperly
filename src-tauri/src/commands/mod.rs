@@ -1,3 +1,4 @@
+pub mod app;
 pub mod filesystem;
 pub mod pages;
 pub mod search;

@@ -1,3 +1,4 @@
+mod atomic_file;
 mod commands;
 mod config_paths;
 mod error;
@@ -30,6 +31,7 @@ pub fn run() {
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(commands::app::AppCloseState::default())
         .manage(Arc::new(vaults::VaultsCache::default()))
         .setup(|app| {
             use tauri::Manager;
@@ -42,6 +44,8 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            // app lifecycle
+            commands::app::app_close_after_flush,
             // settings
             commands::settings::read_settings,
             commands::settings::write_settings,
@@ -81,6 +85,20 @@ pub fn run() {
             commands::search::search_in_vault,
             commands::search::list_files,
         ])
+        .on_window_event(|window, event| {
+            if window.label() != "main" {
+                return;
+            }
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                use tauri::{Emitter, Manager};
+                let state = window.state::<commands::app::AppCloseState>();
+                if state.take_authorization() {
+                    return;
+                }
+                api.prevent_close();
+                let _ = window.emit(events::EV_APP_CLOSE_REQUESTED, ());
+            }
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

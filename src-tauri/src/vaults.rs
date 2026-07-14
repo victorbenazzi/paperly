@@ -45,9 +45,6 @@ impl VaultsCache {
     pub fn replace(&self, vaults: Vec<Vault>) {
         *self.inner.write() = vaults;
     }
-    pub fn snapshot(&self) -> Vec<Vault> {
-        self.inner.read().clone()
-    }
     pub fn roots(&self) -> Vec<String> {
         self.inner.read().iter().map(|v| v.path.clone()).collect()
     }

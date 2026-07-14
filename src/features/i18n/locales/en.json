@@ -2,8 +2,12 @@
   "app": {
     "name": "Paperly"
   },
+  "common": {
+    "cancel": "Cancel",
+    "retry": "Retry",
+    "close": "Close"
+  },
   "titlebar": {
-    "toggleAgent": "Toggle AI panel",
     "pageOptions": "Page options"
   },
   "sidebar": {
@@ -18,6 +22,7 @@
     "back": "Back",
     "newPage": "New page",
     "newFolder": "New folder",
+    "pages": "Pages",
     "search": "Search"
   },
   "tree": {
@@ -55,7 +60,30 @@
     "externalEditMessage": "This note was edited outside Paperly.",
     "conflictMessage": "This note was edited outside Paperly while you had unsaved changes.",
     "reloadFromDisk": "Reload from disk",
-    "keepMyVersion": "Keep my version"
+    "keepMyVersion": "Keep my version",
+    "saving": "Saving",
+    "saved": "Saved",
+    "saveError": "Save failed. Retry",
+    "readOnlyTitle": "This file is open as read only",
+    "readOnlyTruncated": "The file is {{size}} and only part of it was loaded. Paperly will not overwrite it.",
+    "readOnlyEncoding": "The file uses {{encoding}} instead of UTF-8. Paperly will not overwrite it.",
+    "openExternally": "Open in another app",
+    "closeSaveFailedTitle": "Paperly could not save this note",
+    "closeSaveFailedDescription": "The app will stay open so your text is not lost. {{message}}",
+    "closeWithoutSaving": "Close without saving",
+    "closeWithoutSavingConfirmTitle": "Discard the unsaved changes?",
+    "closeWithoutSavingConfirmDescription": "This closes Paperly immediately. Changes that could not be written to disk will be lost.",
+    "closeWithoutSavingConfirmAction": "Discard changes and close",
+    "preservedMarkdown": "Preserved Markdown",
+    "errors": {
+      "staleSession": "The active document changed before the operation completed.",
+      "notReady": "The editor is not ready.",
+      "notReadyToSave": "The editor is not ready to save.",
+      "readOnly": "This document is read only.",
+      "preservedMissing": "A preserved Markdown block disappeared or was truncated during save.",
+      "preservedInvalid": "A preserved Markdown block is invalid and cannot be saved.",
+      "renameRollback": "The page rename failed and Paperly could not restore the previous state. Save error: {{save}}. Restore error: {{rollback}}."
+    }
   },
   "search": {
     "quickSwitcher": "Quick switcher",
@@ -70,12 +98,15 @@
     "truncated": "truncated",
     "error": "Search failed: {{message}}"
   },
-  "agent": {
-    "title": "Assistant",
-    "placeholder": "The AI panel arrives in a later phase."
+  "delete": {
+    "confirmTitle": "Move this page to the Trash?",
+    "confirmDescription": "{{name}} and its subpages will be moved to the system Trash after Paperly saves the latest changes.",
+    "failedTitle": "The page could not be fully deleted",
+    "failedDescription": "Paperly reconciled the files that were moved and kept the remaining items visible. {{message}}"
   },
   "settings": {
     "title": "Settings",
+    "description": "Configure the Paperly appearance, language, and updates.",
     "theme": "Theme",
     "themeSystem": "System",
     "themeLight": "Light",

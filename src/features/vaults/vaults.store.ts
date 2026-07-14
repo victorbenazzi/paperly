@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 
 import { CMD, errorMessage, ipc, usingMockIpc, type Vault, type VaultsFile } from "@/lib/ipc";
+import { useEditorStore } from "@/features/editor/editor.store";
 
 interface VaultsState {
   vaults: Vault[];
@@ -30,6 +31,13 @@ function mostRecentVault(vaults: Vault[]): Vault | null {
     if (!best || v.lastOpenedAt > best.lastOpenedAt) best = v;
   }
   return best;
+}
+
+async function canLeaveActiveVault(): Promise<boolean> {
+  const editor = useEditorStore.getState();
+  if (!editor.path) return true;
+  const result = await editor.saveNow(editor.sessionId);
+  return result.ok || result.reason === "readOnly";
 }
 
 export const useVaultsStore = create<VaultsState>((set, get) => ({
@@ -63,6 +71,7 @@ export const useVaultsStore = create<VaultsState>((set, get) => ({
 
   addViaDialog: async () => {
     if (usingMockIpc) {
+      if (!(await canLeaveActiveVault())) return null;
       const vault = await ipc<Vault>(CMD.vaultAdd, { path: "/vault" });
       const existing = get().vaults.filter((v) => v.id !== vault.id);
       set({ vaults: [...existing, vault], activeVaultId: vault.id });
@@ -70,6 +79,7 @@ export const useVaultsStore = create<VaultsState>((set, get) => ({
     }
     const picked = await openDialog({ directory: true, multiple: false });
     if (!picked || typeof picked !== "string") return null;
+    if (!(await canLeaveActiveVault())) return null;
     const vault = await ipc<Vault>(CMD.vaultAdd, { path: picked });
     const existing = get().vaults.filter((v) => v.id !== vault.id);
     set({ vaults: [...existing, vault], activeVaultId: vault.id });
@@ -78,6 +88,7 @@ export const useVaultsStore = create<VaultsState>((set, get) => ({
 
   createViaDialog: async (baseName) => {
     if (usingMockIpc) {
+      if (!(await canLeaveActiveVault())) return null;
       const vault = await ipc<Vault>(CMD.vaultCreate, { directory: "/", name: baseName });
       const existing = get().vaults.filter((v) => v.id !== vault.id);
       set({ vaults: [...existing, vault], activeVaultId: vault.id });
@@ -85,6 +96,7 @@ export const useVaultsStore = create<VaultsState>((set, get) => ({
     }
     const picked = await openDialog({ directory: true, multiple: false });
     if (!picked || typeof picked !== "string") return null;
+    if (!(await canLeaveActiveVault())) return null;
     let vault: Vault | null = null;
     for (let i = 1; i <= 50 && !vault; i++) {
       const name = i === 1 ? baseName : `${baseName} ${i}`;
@@ -101,6 +113,7 @@ export const useVaultsStore = create<VaultsState>((set, get) => ({
   },
 
   remove: async (id) => {
+    if (get().activeVaultId === id && !(await canLeaveActiveVault())) return;
     await ipc(CMD.vaultRemove, { id });
     const vaults = get().vaults.filter((v) => v.id !== id);
     let activeVaultId = get().activeVaultId;
@@ -127,6 +140,7 @@ export const useVaultsStore = create<VaultsState>((set, get) => ({
 
   setActive: async (id) => {
     if (get().activeVaultId === id) return;
+    if (!(await canLeaveActiveVault())) return;
     await ipc(CMD.vaultSetActive, { id });
     set({ activeVaultId: id });
   },

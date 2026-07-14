@@ -5,6 +5,8 @@ import { invoke as tauriInvoke } from "@tauri-apps/api/core";
  * Adding a new command requires editing BOTH files; treat that as a rule.
  */
 export const CMD = {
+  // app lifecycle
+  appCloseAfterFlush: "app_close_after_flush",
   // settings
   readSettings: "read_settings",
   writeSettings: "write_settings",
@@ -65,8 +67,6 @@ export interface AppError {
     | "PermissionDenied"
     | "PathNotAllowed"
     | "FileTooLarge"
-    | "Store"
-    | "Agent"
     | "Io"
     | "Other";
   message: string;
@@ -138,6 +138,16 @@ export interface PagePaths {
   path: string;
   dirPath: string | null;
 }
+
+export type DeletePageOutcome =
+  | { kind: "deleted"; deletedPaths: string[] }
+  | { kind: "failed"; remainingPaths: string[]; message: string }
+  | {
+      kind: "partial";
+      deletedPaths: string[];
+      remainingPaths: string[];
+      message: string;
+    };
 
 export interface SearchOptions {
   caseSensitive?: boolean;

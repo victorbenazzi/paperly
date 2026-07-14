@@ -2,6 +2,7 @@ import type {
   BytesFile,
   CmdName,
   DirEntry,
+  DeletePageOutcome,
   FileMeta,
   PagePaths,
   SearchResults,
@@ -147,6 +148,7 @@ function movePage(path: string, dirPath: string | null, targetDir: string): Page
 }
 
 const handlers = {
+  app_close_after_flush: async () => null,
   read_settings: async () => settingsState,
   write_settings: async (args) => {
     settingsState = args.value;
@@ -267,10 +269,14 @@ const handlers = {
       String(args.targetDir),
     ),
   delete_page: async (args) => {
+    const deletedPaths = [String(args.path)];
     await handlers.delete_path({ path: args.path });
     const dirPath = args.dirPath as string | null | undefined;
-    if (dirPath) await handlers.delete_path({ path: dirPath });
-    return null;
+    if (dirPath) {
+      await handlers.delete_path({ path: dirPath });
+      deletedPaths.push(dirPath);
+    }
+    return { kind: "deleted", deletedPaths } satisfies DeletePageOutcome;
   },
   save_workspace_state: async (args) => {
     workspaceState = args.state;

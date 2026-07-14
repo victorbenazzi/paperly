@@ -58,11 +58,6 @@ pub fn workspace_dir() -> AppResult<PathBuf> {
     Ok(state_dir()?.join("workspace"))
 }
 
-/// `~/.paperly/state/runtime.json`, sidecar adoption info (pid, url).
-pub fn runtime_file() -> AppResult<PathBuf> {
-    Ok(state_dir()?.join("runtime.json"))
-}
-
 /// Path to a single vault's workspace file: `state/workspace/{id}.json`.
 ///
 /// Guards the id (which is server-generated, but belt-and-suspenders) so a
@@ -111,35 +106,6 @@ pub fn read_json<T: DeserializeOwned + Default>(path: &Path) -> AppResult<T> {
     }
 }
 
-/// Like [`read_json`], but a corrupt existing file is renamed to
-/// `<file>.corrupt` before defaults are returned. For stores whose boot path
-/// persists right after loading: without the rename, one bad hand-edit would
-/// get the only copy of the data overwritten with defaults.
-pub fn read_json_backed<T: DeserializeOwned + Default>(path: &Path) -> AppResult<T> {
-    match fs::read_to_string(path) {
-        Ok(raw) => match serde_json::from_str::<T>(&raw) {
-            Ok(value) => Ok(value),
-            Err(e) => {
-                let backup = path.with_file_name(format!(
-                    "{}.corrupt",
-                    path.file_name()
-                        .and_then(|s| s.to_str())
-                        .unwrap_or("config")
-                ));
-                eprintln!(
-                    "[paperly] config parse failed for {}: {e}; moving it to {} and using defaults",
-                    path.display(),
-                    backup.display()
-                );
-                let _ = fs::rename(path, &backup);
-                Ok(T::default())
-            }
-        },
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(T::default()),
-        Err(e) => Err(AppError::Io(e)),
-    }
-}
-
 /// Like [`read_json`] but returns `None` for an absent file, matching callers
 /// whose contract is `Option<T>` (e.g. `load_workspace_state`). A corrupt file
 /// is treated as `None` + log.
@@ -176,29 +142,5 @@ pub fn write_json_atomic<T: Serialize>(path: &Path, value: &T) -> AppResult<()> 
     }
     let json = serde_json::to_string_pretty(value)
         .map_err(|e| AppError::Other(format!("serialize config: {e}")))?;
-    let tmp = tmp_path(path);
-    fs::write(&tmp, json.as_bytes())?;
-    fs::rename(&tmp, path).map_err(|e| {
-        // best-effort cleanup of the temp file
-        let _ = fs::remove_file(&tmp);
-        AppError::Io(e)
-    })?;
-    Ok(())
-}
-
-/// Unique-per-write temp path next to `path`. Uniqueness (pid + counter) keeps
-/// two concurrent writers of the SAME file from clobbering each other's temp
-/// and failing the rename with a spurious NotFound.
-fn tmp_path(path: &Path) -> PathBuf {
-    use std::sync::atomic::{AtomicU64, Ordering};
-    static COUNTER: AtomicU64 = AtomicU64::new(0);
-    let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-    let file_name = path
-        .file_name()
-        .and_then(|s| s.to_str())
-        .unwrap_or("config");
-    path.with_file_name(format!(
-        "{file_name}.paperly.tmp.{}.{n}",
-        std::process::id()
-    ))
+    crate::atomic_file::write(path, json.as_bytes())
 }

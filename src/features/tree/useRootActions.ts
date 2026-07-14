@@ -25,8 +25,9 @@ export function useRootActions() {
   const newPageAtRoot = async () => {
     if (!vault) return;
     const path = await createNote(vault.path, t("tree.untitled"));
-    openNote(path);
-    revealForRename(path);
+    const tree = useTreeStore.getState();
+    if (!tree.expanded.has(vault.path)) tree.toggleExpanded(vault.path);
+    if (await openNote(path, { focus: "title" })) tree.select(path);
   };
 
   const newFolderAtRoot = async () => {

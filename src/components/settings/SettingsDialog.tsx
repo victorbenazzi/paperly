@@ -19,8 +19,15 @@ import { useThemeStore, type ThemeMode } from "@/features/theme/theme.store";
 import { useUpdatesStore } from "@/features/updates/updates.store";
 import { checkManual, startInstall } from "@/features/updates/updates.service";
 import { SUPPORTED_LANGUAGES } from "@/features/i18n/config";
+import { useEditorStore } from "@/features/editor/editor.store";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -156,6 +163,7 @@ export function SettingsDialog() {
   const setOpen = useUiStore((s) => s.setSettingsOpen);
   const mode = useThemeStore((s) => s.mode);
   const setMode = useThemeStore((s) => s.setMode);
+  const [changingLanguage, setChangingLanguage] = useState(false);
 
   // null while resolving and in the browser-mock mode, where the Tauri IPC
   // behind getVersion does not exist; the row just omits the version then.
@@ -182,11 +190,29 @@ export function SettingsDialog() {
     SUPPORTED_LANGUAGES.find((l) => (i18n.resolvedLanguage ?? i18n.language) === l.id) ??
     SUPPORTED_LANGUAGES[0];
 
+  const changeLanguage = async (languageId: string) => {
+    if (changingLanguage || languageId === currentLanguage.id) return;
+    setChangingLanguage(true);
+    try {
+      const session = useEditorStore.getState();
+      if (session.path && session.status !== "readOnly") {
+        const saved = await session.saveNow(session.sessionId);
+        if (!saved.ok) return;
+      }
+      await i18n.changeLanguage(languageId);
+    } finally {
+      setChangingLanguage(false);
+    }
+  };
+
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="gap-0 p-0 sm:max-w-md">
+      <DialogContent className="gap-0 p-0 sm:max-w-md" closeLabel={t("common.close")}>
         <DialogHeader className="border-b border-hairline px-4 py-3.5">
           <DialogTitle className="text-sm font-semibold">{t("settings.title")}</DialogTitle>
+          <DialogDescription className="sr-only">
+            {t("settings.description")}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col px-4 py-2.5">
@@ -219,7 +245,8 @@ export function SettingsDialog() {
                   {SUPPORTED_LANGUAGES.map((lang) => (
                     <DropdownMenuItem
                       key={lang.id}
-                      onClick={() => void i18n.changeLanguage(lang.id)}
+                      disabled={changingLanguage}
+                      onClick={() => void changeLanguage(lang.id)}
                     >
                       <span className="flex-1">{lang.native}</span>
                       {currentLanguage.id === lang.id ? (

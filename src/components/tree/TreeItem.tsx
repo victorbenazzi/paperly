@@ -17,7 +17,8 @@ import { useTreeStore } from "@/features/tree/tree.store";
 import { useDragStore, dragJustEnded } from "@/features/tree/drag.store";
 import { useNavStore } from "@/features/nav/nav.store";
 import { usePageMetaStore } from "@/features/pages/pageMeta.store";
-import { closeDeletedPaths, remapPagePaths } from "@/features/pages/pagePaths";
+import { remapPagePaths } from "@/features/pages/pagePaths";
+import { deletePageFlow } from "@/features/pages/deletePageFlow";
 import { renamePage } from "@/features/pages/renamePage";
 import {
   ContextMenu,
@@ -57,7 +58,6 @@ export function TreeItem({ node, depth, expanded, onToggle }: TreeItemProps) {
   const renaming = useTreeStore((s) => s.renamingPath === node.path);
   const startRename = useTreeStore((s) => s.startRename);
   const renameNode = useTreeStore((s) => s.renameNode);
-  const deleteNode = useTreeStore((s) => s.deleteNode);
   const createNote = useTreeStore((s) => s.createNote);
   const toggleExpanded = useTreeStore((s) => s.toggleExpanded);
   const createFolder = useTreeStore((s) => s.createFolder);
@@ -108,16 +108,19 @@ export function TreeItem({ node, depth, expanded, onToggle }: TreeItemProps) {
       ? dropTarget.line
       : null;
 
-  const activate = () => {
+  const activate = async () => {
     if (dragJustEnded()) return;
-    select(node.path);
     if (isPage || node.kind === "image") {
-      openNote(node.path);
+      if (await openNote(node.path)) select(node.path);
     } else if (node.kind === "file") {
       const ext = node.name.split(".").pop()?.toLowerCase() ?? "";
-      if (TEXT_EXTS.has(ext)) openNote(node.path);
-      else void ipc(CMD.openWithDefaultApp, { path: node.path }).catch(() => {});
+      if (TEXT_EXTS.has(ext)) {
+        if (await openNote(node.path)) select(node.path);
+      } else {
+        void ipc(CMD.openWithDefaultApp, { path: node.path }).catch(() => {});
+      }
     } else if (node.kind === "folder") {
+      select(node.path);
       onToggle();
     }
   };
@@ -153,9 +156,7 @@ export function TreeItem({ node, depth, expanded, onToggle }: TreeItemProps) {
       const path = await createNote(dir, t("tree.untitled"));
       if (!useTreeStore.getState().expanded.has(dir)) toggleExpanded(dir);
       await useTreeStore.getState().loadDir(dir);
-      select(path);
-      openNote(path);
-      startRename(path);
+      if (await openNote(path, { focus: "title" })) select(path);
     } catch (err) {
       console.error("add subpage failed:", errorMessage(err));
     }
@@ -180,20 +181,76 @@ export function TreeItem({ node, depth, expanded, onToggle }: TreeItemProps) {
   };
 
   const remove = async () => {
-    try {
-      closeDeletedPaths(node.path, node.dirPath);
-      await deleteNode(node.path, node.dirPath);
-    } catch (err) {
-      console.error("delete failed:", errorMessage(err));
-    }
+    await deletePageFlow(node.path, node.dirPath);
   };
 
   const reveal = () => void ipc(CMD.revealInFinder, { path: node.path }).catch(() => {});
 
   const Icon = KIND_ICON[node.kind];
 
+  const handleTreeKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.target !== event.currentTarget) return;
+    const tree = event.currentTarget.closest<HTMLElement>('[role="tree"]');
+    if (!tree) return;
+    const rows = Array.from(tree.querySelectorAll<HTMLElement>('[role="treeitem"]'));
+    const index = rows.indexOf(event.currentTarget);
+    const focusAt = (next: number) => rows[Math.max(0, Math.min(rows.length - 1, next))]?.focus();
+
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      focusAt(index + 1);
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      focusAt(index - 1);
+    } else if (event.key === "Home") {
+      event.preventDefault();
+      focusAt(0);
+    } else if (event.key === "End") {
+      event.preventDefault();
+      focusAt(rows.length - 1);
+    } else if (event.key === "ArrowRight") {
+      event.preventDefault();
+      if (expandable && !expanded) onToggle();
+      else if (expandable && rows[index + 1]?.getAttribute("aria-level") === String(depth + 2)) {
+        focusAt(index + 1);
+      }
+    } else if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      if (expandable && expanded) {
+        onToggle();
+      } else {
+        const parentLevel = depth;
+        for (let previous = index - 1; previous >= 0; previous -= 1) {
+          if (rows[previous]?.getAttribute("aria-level") === String(parentLevel)) {
+            rows[previous]?.focus();
+            break;
+          }
+        }
+      }
+    } else if (event.key === "Enter") {
+      event.preventDefault();
+      void activate();
+    } else if (event.key === "F2") {
+      event.preventDefault();
+      startRename(node.path);
+    } else if (event.key === "Delete") {
+      event.preventDefault();
+      void remove();
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      startRename(null);
+      useDragStore.getState().end();
+    }
+  };
+
   const row = (
     <div
+      role="treeitem"
+      aria-label={node.name}
+      aria-level={depth + 1}
+      aria-selected={selected}
+      aria-expanded={expandable ? expanded : undefined}
+      tabIndex={selected ? 0 : -1}
       data-tree-row
       data-path={node.path}
       data-name={node.name}
@@ -201,14 +258,17 @@ export function TreeItem({ node, depth, expanded, onToggle }: TreeItemProps) {
       data-dir={node.dirPath ?? undefined}
       data-expanded={expanded ? "1" : undefined}
       className={cn(
-        "group relative flex h-7 cursor-pointer items-center gap-1 rounded-sm pr-1 text-sm",
+        "group relative flex h-8 cursor-pointer items-center gap-1 rounded-sm pr-1 text-sm outline-none",
         "text-ink-secondary transition-colors duration-(--dur-fast)",
+        "focus-visible:ring-2 focus-visible:ring-accent-blue/50 focus-visible:ring-inset",
         selected ? "bg-hover-wash-strong text-ink" : "hover:bg-hover-wash hover:text-ink",
         isDropTarget && "bg-accent-blue-soft outline-1 outline-accent-blue/50 -outline-offset-1",
         dragging?.path === node.path && "opacity-40",
       )}
       style={{ paddingLeft: `${8 + depth * 14}px` }}
-      onClick={activate}
+      onClick={() => void activate()}
+      onFocus={() => select(node.path)}
+      onKeyDown={handleTreeKeyDown}
       onPointerDown={(e) => {
         if (e.button !== 0) return;
         pressRef.current = { x: e.clientX, y: e.clientY };
@@ -244,6 +304,7 @@ export function TreeItem({ node, depth, expanded, onToggle }: TreeItemProps) {
         </span>
       ) : null}
       <span
+        role="presentation"
         className={cn(
           "flex size-4 shrink-0 items-center justify-center text-ink-faint",
           expandable && "hover:text-ink",
@@ -277,6 +338,7 @@ export function TreeItem({ node, depth, expanded, onToggle }: TreeItemProps) {
           onChange={(e) => setDraft(e.target.value)}
           onBlur={() => void commitRename()}
           onKeyDown={(e) => {
+            e.stopPropagation();
             if (e.key === "Enter") void commitRename();
             if (e.key === "Escape") startRename(null);
           }}
@@ -292,7 +354,7 @@ export function TreeItem({ node, depth, expanded, onToggle }: TreeItemProps) {
         <span
           className={cn(
             "hidden shrink-0 items-center gap-0.5",
-            !dragging && "group-hover:flex",
+            !dragging && "group-hover:flex group-focus-within:flex",
             menuOpen && "flex",
           )}
         >
@@ -302,7 +364,7 @@ export function TreeItem({ node, depth, expanded, onToggle }: TreeItemProps) {
                 type="button"
                 aria-label={t("tree.more")}
                 onClick={(e) => e.stopPropagation()}
-                className="flex size-5 items-center justify-center rounded-xs text-ink-faint hover:bg-hover-wash-strong hover:text-ink"
+                className="flex size-7 items-center justify-center rounded-xs text-ink-muted hover:bg-hover-wash-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-accent-blue/50"
               >
                 <MoreHorizontal size={14} />
               </button>
@@ -338,7 +400,7 @@ export function TreeItem({ node, depth, expanded, onToggle }: TreeItemProps) {
                   e.stopPropagation();
                   void addSubfolder();
                 }}
-                className="flex size-5 items-center justify-center rounded-xs text-ink-faint hover:bg-hover-wash-strong hover:text-ink"
+                className="flex size-7 items-center justify-center rounded-xs text-ink-muted hover:bg-hover-wash-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-accent-blue/50"
               >
                 <Folder size={14} />
               </button>
@@ -349,7 +411,7 @@ export function TreeItem({ node, depth, expanded, onToggle }: TreeItemProps) {
                   e.stopPropagation();
                   void addSubpage();
                 }}
-                className="flex size-5 items-center justify-center rounded-xs text-ink-faint hover:bg-hover-wash-strong hover:text-ink"
+                className="flex size-7 items-center justify-center rounded-xs text-ink-muted hover:bg-hover-wash-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-accent-blue/50"
               >
                 <Plus size={14} />
               </button>

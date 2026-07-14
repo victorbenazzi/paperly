@@ -22,8 +22,8 @@
   /* ink */
   --ink: #37352f;
   --ink-secondary: #5f5e5b;
-  --ink-muted: #787774;
-  --ink-faint: #a39e98;
+  --ink-muted: #74716d;
+  --ink-faint: #6f6d69;
 
   /* the single structural accent */
   --accent: #0075de;
@@ -35,10 +35,10 @@
   --indigo: #213183;
 
   /* semantic */
-  --danger: #eb5757;
+  --danger: #b42318;
   --danger-soft: rgba(235, 87, 87, 0.12);
-  --warning: #cb912f;
-  --success: #1aae39;
+  --warning: #7a5100;
+  --success: #187a2f;
 
   /* sticker palette: decorative only (page icons, category dots, illustrations) */
   --sticker-sky: #62aef0;
@@ -84,8 +84,8 @@
 
   --ink: rgba(255, 255, 255, 0.9);
   --ink-secondary: #c8c5bf;
-  --ink-muted: #9b9892;
-  --ink-faint: #6f6c66;
+  --ink-muted: #aaa7a0;
+  --ink-faint: #9b9892;
 
   --accent: #4ba3f5;
   --accent-active: #2e8de8;

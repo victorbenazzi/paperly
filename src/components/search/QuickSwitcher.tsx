@@ -54,8 +54,8 @@ export function QuickSwitcher() {
     return fuzzyFilter(files, query, (f) => stripMdExt(relativeToVault(f, root)));
   }, [files, query, vault]);
 
-  const handleSelect = (path: string) => {
-    openNote(path);
+  const handleSelect = async (path: string) => {
+    if (!(await openNote(path))) return;
     select(path);
     close();
   };
@@ -85,7 +85,7 @@ export function QuickSwitcher() {
               <CommandItem
                 key={path}
                 value={path}
-                onSelect={() => handleSelect(path)}
+                onSelect={() => void handleSelect(path)}
               >
                 <FileText size={14} className="shrink-0 text-ink-muted" />
                 <span className="truncate">{name}</span>

@@ -14,12 +14,6 @@ pub enum AppError {
     #[error("file too large: {0}")]
     FileTooLarge(String),
 
-    #[error("store error: {0}")]
-    Store(String),
-
-    #[error("agent error: {0}")]
-    Agent(String),
-
     #[error("io: {0}")]
     Io(#[from] std::io::Error),
 
@@ -38,8 +32,6 @@ impl Serialize for AppError {
             AppError::PermissionDenied(m) => ("PermissionDenied", m.clone()),
             AppError::PathNotAllowed(m) => ("PathNotAllowed", m.clone()),
             AppError::FileTooLarge(m) => ("FileTooLarge", m.clone()),
-            AppError::Store(m) => ("Store", m.clone()),
-            AppError::Agent(m) => ("Agent", m.clone()),
             AppError::Io(e) => ("Io", e.to_string()),
             AppError::Other(m) => ("Other", m.clone()),
         };

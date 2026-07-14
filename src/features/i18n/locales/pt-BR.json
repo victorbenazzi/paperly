@@ -2,8 +2,12 @@
   "app": {
     "name": "Paperly"
   },
+  "common": {
+    "cancel": "Cancelar",
+    "retry": "Tentar novamente",
+    "close": "Fechar"
+  },
   "titlebar": {
-    "toggleAgent": "Alternar painel de IA",
     "pageOptions": "Opções da página"
   },
   "sidebar": {
@@ -18,6 +22,7 @@
     "back": "Voltar",
     "newPage": "Nova página",
     "newFolder": "Nova pasta",
+    "pages": "Páginas",
     "search": "Buscar"
   },
   "tree": {
@@ -55,7 +60,30 @@
     "externalEditMessage": "Esta nota foi editada fora do Paperly.",
     "conflictMessage": "Esta nota foi editada fora do Paperly enquanto você tinha alterações não salvas.",
     "reloadFromDisk": "Recarregar do disco",
-    "keepMyVersion": "Manter minha versão"
+    "keepMyVersion": "Manter minha versão",
+    "saving": "Salvando",
+    "saved": "Salvo",
+    "saveError": "Falha ao salvar. Tentar novamente",
+    "readOnlyTitle": "Este arquivo está aberto apenas para leitura",
+    "readOnlyTruncated": "O arquivo tem {{size}} e somente parte dele foi carregada. O Paperly não vai sobrescrevê-lo.",
+    "readOnlyEncoding": "O arquivo usa {{encoding}} em vez de UTF-8. O Paperly não vai sobrescrevê-lo.",
+    "openExternally": "Abrir em outro aplicativo",
+    "closeSaveFailedTitle": "O Paperly não conseguiu salvar esta nota",
+    "closeSaveFailedDescription": "O aplicativo permanecerá aberto para que seu texto não seja perdido. {{message}}",
+    "closeWithoutSaving": "Fechar sem salvar",
+    "closeWithoutSavingConfirmTitle": "Descartar as alterações não salvas?",
+    "closeWithoutSavingConfirmDescription": "Isso fecha o Paperly imediatamente. As alterações que não puderam ser gravadas no disco serão perdidas.",
+    "closeWithoutSavingConfirmAction": "Descartar alterações e fechar",
+    "preservedMarkdown": "Markdown preservado",
+    "errors": {
+      "staleSession": "O documento ativo mudou antes da conclusão da operação.",
+      "notReady": "O editor ainda não está pronto.",
+      "notReadyToSave": "O editor ainda não está pronto para salvar.",
+      "readOnly": "Este documento está somente para leitura.",
+      "preservedMissing": "Um bloco de Markdown preservado desapareceu ou foi truncado durante o salvamento.",
+      "preservedInvalid": "Um bloco de Markdown preservado é inválido e não pode ser salvo.",
+      "renameRollback": "A renomeação da página falhou e o Paperly não conseguiu restaurar o estado anterior. Erro ao salvar: {{save}}. Erro ao restaurar: {{rollback}}."
+    }
   },
   "search": {
     "quickSwitcher": "Navegação rápida",
@@ -70,12 +98,15 @@
     "truncated": "truncado",
     "error": "A busca falhou: {{message}}"
   },
-  "agent": {
-    "title": "Assistente",
-    "placeholder": "O painel de IA chega numa fase futura."
+  "delete": {
+    "confirmTitle": "Mover esta página para a Lixeira?",
+    "confirmDescription": "{{name}} e suas subpáginas serão movidas para a Lixeira do sistema depois que o Paperly salvar as alterações mais recentes.",
+    "failedTitle": "A página não pôde ser excluída por completo",
+    "failedDescription": "O Paperly reconciliou os arquivos movidos e manteve os itens restantes visíveis. {{message}}"
   },
   "settings": {
     "title": "Configurações",
+    "description": "Configure a aparência, o idioma e as atualizações do Paperly.",
     "theme": "Tema",
     "themeSystem": "Sistema",
     "themeLight": "Claro",

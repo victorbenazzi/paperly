@@ -2,162 +2,289 @@ import { create } from "zustand";
 
 import { CMD, ipc, errorMessage, type TextFile } from "@/lib/ipc";
 import { usePageMetaStore } from "@/features/pages/pageMeta.store";
-import {
-  joinFrontmatter,
-  splitFrontmatter,
-  type NoteMeta,
-} from "./markdown/frontmatter";
+import i18n from "@/features/i18n/config";
+import { joinFrontmatter, splitFrontmatter, type NoteMeta } from "./markdown/frontmatter";
 
-export type SaveStatus = "idle" | "loading" | "dirty" | "saving" | "saved" | "error";
+export type SaveStatus =
+  | "idle"
+  | "loading"
+  | "ready"
+  | "dirty"
+  | "saving"
+  | "saved"
+  | "error"
+  | "readOnly";
+
+export type SaveFailureReason = "serialize" | "write" | "staleSession" | "readOnly";
+
+export type SaveResult =
+  | { ok: true; wrote: boolean }
+  | { ok: false; reason: SaveFailureReason; message: string };
+
+export type LoadResult =
+  | {
+      ok: true;
+      sessionId: number;
+      path: string;
+      body: string;
+      mode: "editable" | "readOnly";
+    }
+  | {
+      ok: false;
+      reason: "read" | "saveFailed" | "staleSession";
+      message: string;
+    };
+
+export interface ReadOnlyInfo {
+  reason: "truncated" | "encoding";
+  encoding: string;
+  size: number;
+}
 
 const AUTOSAVE_DEBOUNCE_MS = 800;
+const editorMessage = (key: string) => i18n.t(`editor.errors.${key}`);
+const staleSessionMessage = () => editorMessage("staleSession");
 
-/**
- * Open-note IO: load, debounced autosave, flush. The BlockNote instance lives
- * in the component; it registers a serializer here so blur/quit/note-switch
- * can flush without the store knowing the editor type.
- *
- * Invariants:
- * - never write on open (normalization churn would dirty agent diffs)
- * - skip the write when the serialized body is unchanged
- * - `lastSavedContent` is the exact text on disk as of our last read/write;
- *   the Fase 4 watcher uses it to tell our own echo from external edits.
- */
-interface EditorState {
+export interface DocumentSession {
+  sessionId: number;
   path: string | null;
   status: SaveStatus;
   error: string | null;
+  readOnlyInfo: ReadOnlyInfo | null;
   meta: NoteMeta;
-  /** Meta changed without a body change (e.g. icon); forces the next write. */
   metaDirty: boolean;
   lastSavedBody: string | null;
   lastSavedContent: string | null;
+  revision: number;
 
   serializer: (() => Promise<string>) | null;
-  /** Replaces the editor content with a body; registered by the component. */
   reloader: ((body: string) => Promise<void>) | null;
   saveTimer: number | null;
+}
 
-  load: (path: string) => Promise<string | null>;
-  /** Set or clear the page icon (frontmatter `icon`) and persist right away. */
+/**
+ * One state machine owns the open document and every disk-facing transition.
+ * Component callbacks are registered against a session id, so an editor that
+ * is unmounting can never mutate or save the editor that replaced it.
+ */
+interface EditorState extends DocumentSession {
+  load: (path: string) => Promise<LoadResult>;
   setIcon: (icon: string | null) => void;
-  registerSerializer: (fn: (() => Promise<string>) | null) => void;
-  registerReloader: (fn: ((body: string) => Promise<void>) | null) => void;
-  scheduleSave: () => void;
-  saveNow: () => Promise<void>;
-  /** Adopt `diskContent` (an external edit) as the new saved state. */
-  reloadFromDisk: (path: string, diskContent: string) => Promise<void>;
-  close: () => Promise<void>;
-  /** Drop the open note WITHOUT flushing: its file is going away, and a
-      pending autosave would resurrect it on disk. */
-  discard: () => void;
-  /** The open note moved on disk (rename/drag); follow without reloading. */
+  registerSerializer: (sessionId: number, fn: (() => Promise<string>) | null) => void;
+  registerReloader: (
+    sessionId: number,
+    fn: ((body: string) => Promise<void>) | null,
+  ) => void;
+  scheduleSave: (sessionId?: number) => void;
+  saveNow: (sessionId?: number) => Promise<SaveResult>;
+  forceSave: (sessionId?: number) => Promise<SaveResult>;
+  reloadFromDisk: (path: string, diskContent: string) => Promise<SaveResult>;
+  close: (sessionId: number) => Promise<SaveResult>;
+  discard: (sessionId?: number) => void;
   remap: (path: string) => void;
 }
 
+let nextSessionId = 0;
+
 export const useEditorStore = create<EditorState>((set, get) => ({
+  sessionId: 0,
   path: null,
   status: "idle",
   error: null,
+  readOnlyInfo: null,
   meta: {},
   metaDirty: false,
   lastSavedBody: null,
   lastSavedContent: null,
+  revision: 0,
   serializer: null,
   reloader: null,
   saveTimer: null,
 
   load: async (path) => {
-    // Switching notes flushes the previous one first.
-    await get().saveNow();
-    set({ path, status: "loading", error: null, serializer: null, reloader: null });
+    const previous = get();
+    if (previous.path) {
+      const flushed = await get().saveNow(previous.sessionId);
+      if (!flushed.ok && flushed.reason !== "staleSession" && flushed.reason !== "readOnly") {
+        return { ok: false, reason: "saveFailed", message: flushed.message };
+      }
+    }
+
+    const sessionId = ++nextSessionId;
+    set({
+      sessionId,
+      path,
+      status: "loading",
+      error: null,
+      readOnlyInfo: null,
+      meta: {},
+      metaDirty: false,
+      lastSavedBody: null,
+      lastSavedContent: null,
+      revision: 0,
+      serializer: null,
+      reloader: null,
+      saveTimer: null,
+    });
+
     try {
       const file = await ipc<TextFile>(CMD.readFileText, { path });
+      const current = get();
+      if (current.sessionId !== sessionId || current.path !== path) {
+        return { ok: false, reason: "staleSession", message: staleSessionMessage() };
+      }
+
       const { meta, body } = splitFrontmatter(file.content);
+      const readOnlyInfo: ReadOnlyInfo | null = file.truncated
+        ? { reason: "truncated", encoding: file.encoding, size: file.size }
+        : file.encoding.toLowerCase() !== "utf-8"
+          ? { reason: "encoding", encoding: file.encoding, size: file.size }
+          : null;
       set({
-        status: "idle",
+        status: readOnlyInfo ? "readOnly" : "ready",
+        error: null,
+        readOnlyInfo,
         meta,
         metaDirty: false,
         lastSavedBody: body,
         lastSavedContent: file.content,
       });
-      return body;
+      return {
+        ok: true,
+        sessionId,
+        path,
+        body,
+        mode: readOnlyInfo ? "readOnly" : "editable",
+      };
     } catch (err) {
-      set({ status: "error", error: errorMessage(err) });
-      return null;
+      const message = errorMessage(err);
+      if (get().sessionId !== sessionId || get().path !== path) {
+        return { ok: false, reason: "staleSession", message: staleSessionMessage() };
+      }
+      set({ status: "error", error: message });
+      return { ok: false, reason: "read", message };
     }
   },
 
   setIcon: (icon) => {
-    const { path, meta } = get();
-    if (!path) return;
+    const { path, meta, sessionId, status } = get();
+    if (!path || status === "readOnly") return;
     const next: NoteMeta = { ...meta };
     if (icon) next.icon = icon;
     else delete next.icon;
-    set({ meta: next, metaDirty: true });
+    set((state) => ({
+      meta: next,
+      metaDirty: true,
+      status: "dirty",
+      revision: state.revision + 1,
+    }));
     usePageMetaStore.getState().setIcon(path, icon);
-    void get().saveNow();
+    void get().saveNow(sessionId);
   },
 
-  registerSerializer: (fn) => set({ serializer: fn }),
+  registerSerializer: (sessionId, fn) => {
+    if (get().sessionId === sessionId) set({ serializer: fn });
+  },
 
-  registerReloader: (fn) => set({ reloader: fn }),
+  registerReloader: (sessionId, fn) => {
+    if (get().sessionId === sessionId) set({ reloader: fn });
+  },
 
-  reloadFromDisk: (path, diskContent) =>
-    // Joins the save queue: a flush already serializing would otherwise
-    // capture a pre-reload snapshot and write it back over the disk version.
-    enqueue(async () => {
+  reloadFromDisk: (path, diskContent) => {
+    const sessionId = get().sessionId;
+    return enqueue(async () => {
       const { path: openPath, reloader, saveTimer } = get();
-      if (openPath !== path || !reloader) return;
-      if (saveTimer !== null) {
-        window.clearTimeout(saveTimer);
-        set({ saveTimer: null });
+      if (get().sessionId !== sessionId || openPath !== path) {
+        return { ok: false, reason: "staleSession", message: staleSessionMessage() };
       }
-      const { meta, body } = splitFrontmatter(diskContent);
-      await reloader(body);
-      set({
-        meta,
-        metaDirty: false,
-        lastSavedBody: body,
-        lastSavedContent: diskContent,
-        status: "idle",
-      });
-    }),
+      if (!reloader) {
+        return { ok: false, reason: "serialize", message: editorMessage("notReady") };
+      }
+      if (saveTimer !== null) window.clearTimeout(saveTimer);
+      try {
+        const { meta, body } = splitFrontmatter(diskContent);
+        await reloader(body);
+        if (get().sessionId !== sessionId || get().path !== path) {
+          return { ok: false, reason: "staleSession", message: staleSessionMessage() };
+        }
+        set({
+          meta,
+          metaDirty: false,
+          lastSavedBody: body,
+          lastSavedContent: diskContent,
+          status: "ready",
+          error: null,
+          saveTimer: null,
+        });
+        return { ok: true, wrote: false };
+      } catch (err) {
+        const message = errorMessage(err);
+        if (get().sessionId === sessionId) set({ status: "error", error: message });
+        return { ok: false, reason: "serialize", message };
+      }
+    });
+  },
 
-  scheduleSave: () => {
-    const { saveTimer } = get();
-    if (saveTimer !== null) window.clearTimeout(saveTimer);
+  scheduleSave: (requestedSessionId) => {
+    const current = get();
+    const sessionId = requestedSessionId ?? current.sessionId;
+    if (current.sessionId !== sessionId || current.status === "readOnly") return;
+    if (current.saveTimer !== null) window.clearTimeout(current.saveTimer);
     const timer = window.setTimeout(() => {
-      void get().saveNow();
+      void get().saveNow(sessionId);
     }, AUTOSAVE_DEBOUNCE_MS);
-    set({ status: "dirty", saveTimer: timer });
+    set((state) => ({
+      status: "dirty",
+      error: null,
+      saveTimer: timer,
+      revision: state.revision + 1,
+    }));
   },
 
-  // Queued, never concurrent: switching notes fires a flush from the old
-  // editor's close() AND from the new editor's load(); run in parallel they
-  // both pass the "body changed?" check and write twice.
-  saveNow: () => enqueue(doSave),
-
-  close: async () => {
-    const closing = get().path;
-    await get().saveNow();
-    // While the flush was in flight a newer note may have loaded; the store
-    // now belongs to it, so this close must not wipe its state.
-    if (get().path !== closing) return;
-    get().discard();
+  saveNow: (requestedSessionId) => {
+    const sessionId = requestedSessionId ?? get().sessionId;
+    return enqueue(() => doSave(sessionId));
   },
 
-  discard: () => {
+  forceSave: (requestedSessionId) => {
+    const sessionId = requestedSessionId ?? get().sessionId;
+    if (get().sessionId !== sessionId) {
+      return Promise.resolve({
+        ok: false,
+        reason: "staleSession",
+        message: staleSessionMessage(),
+      });
+    }
+    if (get().status !== "readOnly") {
+      set((state) => ({
+        metaDirty: true,
+        status: "dirty",
+        revision: state.revision + 1,
+      }));
+    }
+    return get().saveNow(sessionId);
+  },
+
+  close: async (sessionId) => {
+    const saved = await get().saveNow(sessionId);
+    if (saved.ok && get().sessionId === sessionId) get().discard(sessionId);
+    return saved;
+  },
+
+  discard: (sessionId) => {
+    if (sessionId !== undefined && get().sessionId !== sessionId) return;
     const { saveTimer } = get();
     if (saveTimer !== null) window.clearTimeout(saveTimer);
     set({
       path: null,
       status: "idle",
       error: null,
+      readOnlyInfo: null,
       meta: {},
       metaDirty: false,
       lastSavedBody: null,
       lastSavedContent: null,
+      revision: 0,
       serializer: null,
       reloader: null,
       saveTimer: null,
@@ -167,69 +294,93 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   remap: (path) => set({ path }),
 }));
 
-let saveChain: Promise<void> = Promise.resolve();
+let saveChain: Promise<SaveResult> = Promise.resolve({ ok: true, wrote: false });
 
-/** Serialize every disk-facing editor task; they race each other otherwise. */
-function enqueue(task: () => Promise<void>): Promise<void> {
-  const next = saveChain.then(task);
-  saveChain = next.catch(() => {});
+function enqueue(task: () => Promise<SaveResult>): Promise<SaveResult> {
+  const next = saveChain.then(task, task);
+  saveChain = next;
   return next;
 }
 
-async function doSave(): Promise<void> {
+async function doSave(sessionId: number): Promise<SaveResult> {
   const get = useEditorStore.getState;
   const set = useEditorStore.setState;
+  const current = get();
+  if (current.sessionId !== sessionId) {
+    return { ok: false, reason: "staleSession", message: staleSessionMessage() };
+  }
+  if (current.status === "readOnly") {
+    return { ok: false, reason: "readOnly", message: editorMessage("readOnly") };
+  }
 
-  const { path, serializer, saveTimer, meta, lastSavedBody } = get();
+  const { path, serializer, saveTimer, meta, lastSavedBody, revision } = current;
   if (saveTimer !== null) {
     window.clearTimeout(saveTimer);
     set({ saveTimer: null });
   }
-  if (!path || !serializer) return;
+  if (!path) return { ok: true, wrote: false };
+  if (!serializer) {
+    if (
+      current.status === "loading" ||
+      current.status === "ready" ||
+      (current.lastSavedContent === null && !current.metaDirty)
+    ) {
+      return { ok: true, wrote: false };
+    }
+    const message = editorMessage("notReadyToSave");
+    set({ status: "error", error: message });
+    return { ok: false, reason: "serialize", message };
+  }
 
   let body: string;
   try {
     body = await serializer();
-  } catch {
-    return; // editor mid-teardown; nothing reliable to save
+  } catch (err) {
+    const message = errorMessage(err);
+    if (get().sessionId === sessionId) set({ status: "error", error: message });
+    return { ok: false, reason: "serialize", message };
   }
-  // The note may have been discarded (deleted) or remapped while the
-  // serializer ran; writing through the captured path would recreate it.
-  if (get().path !== path) return;
+  if (get().sessionId !== sessionId || get().path !== path) {
+    return { ok: false, reason: "staleSession", message: staleSessionMessage() };
+  }
   if (body === lastSavedBody && !get().metaDirty) {
-    if (get().status === "dirty") set({ status: "saved" });
-    return;
+    if (get().revision === revision && get().status === "dirty") {
+      set({ status: "saved", error: null });
+    }
+    return { ok: true, wrote: false };
   }
 
-  // Only touch `updated` when the file already carries frontmatter:
-  // Paperly never introduces frontmatter into a plain markdown file.
   const hasMeta = Object.keys(meta).length > 0;
-  const nextMeta: NoteMeta = hasMeta
-    ? { ...meta, updated: new Date().toISOString() }
-    : meta;
+  const nextMeta: NoteMeta = hasMeta ? { ...meta, updated: new Date().toISOString() } : meta;
   const content = joinFrontmatter(nextMeta, body);
 
-  set({ status: "saving" });
+  set({ status: "saving", error: null });
   try {
     await ipc(CMD.writeFileText, { path, content });
+    if (get().sessionId !== sessionId || get().path !== path) {
+      return { ok: false, reason: "staleSession", message: staleSessionMessage() };
+    }
+    const latest = get();
+    const hasNewerChanges = latest.revision !== revision;
     set({
-      status: "saved",
-      meta: nextMeta,
-      metaDirty: false,
+      status: hasNewerChanges ? "dirty" : "saved",
+      error: null,
+      meta: hasNewerChanges ? latest.meta : nextMeta,
+      metaDirty: hasNewerChanges ? latest.metaDirty : false,
       lastSavedBody: body,
       lastSavedContent: content,
     });
+    return { ok: true, wrote: true };
   } catch (err) {
-    set({ status: "error", error: errorMessage(err) });
+    const message = errorMessage(err);
+    if (get().sessionId === sessionId) set({ status: "error", error: message });
+    return { ok: false, reason: "write", message };
   }
 }
 
-/** Flush on window blur and before quit. Call once at startup. */
+/** Best-effort blur flush. Native quit uses the explicit close handshake. */
 export function initEditorFlushListeners() {
   window.addEventListener("blur", () => {
-    void useEditorStore.getState().saveNow();
-  });
-  window.addEventListener("beforeunload", () => {
     void useEditorStore.getState().saveNow();
   });
 }

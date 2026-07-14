@@ -23,13 +23,12 @@ export function remapPagePaths(from: string, to: string): void {
 }
 
 /**
- * A page (or the folder subtree holding it) is being deleted. Call BEFORE the
- * disk delete: the editor must drop its state without flushing, or a pending
- * autosave resurrects the file; nav must close, or the dead path stays open.
+ * Close only paths the backend confirmed were moved to the Trash. The caller
+ * has already flushed the current document before invoking the backend.
  */
-export function closeDeletedPaths(path: string, dirPath: string | null): void {
+export function closeDeletedPaths(deletedPaths: string[]): void {
   const within = (p: string) =>
-    p === path || (dirPath !== null && (p === dirPath || p.startsWith(`${dirPath}/`)));
+    deletedPaths.some((deleted) => p === deleted || p.startsWith(`${deleted}/`));
   const editor = useEditorStore.getState();
   if (editor.path && within(editor.path)) editor.discard();
   const nav = useNavStore.getState();

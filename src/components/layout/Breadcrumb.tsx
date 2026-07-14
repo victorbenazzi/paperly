@@ -31,8 +31,7 @@ function AncestorCrumb({ dirPath, name }: { dirPath: string; name: string }) {
   const activate = async () => {
     try {
       await ipc(CMD.stat, { path: mdPath });
-      openNote(mdPath);
-      select(mdPath);
+      if (await openNote(mdPath)) select(mdPath);
     } catch {
       select(dirPath);
       if (!useTreeStore.getState().expanded.has(dirPath)) {

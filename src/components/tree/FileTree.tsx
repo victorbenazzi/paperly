@@ -41,7 +41,7 @@ function TreeLevel({ dirPath, depth }: { dirPath: string; depth: number }) {
       {nodes.map((node) => {
         const isOpen = node.dirPath !== null && expanded.has(node.dirPath);
         return (
-          <div key={node.path}>
+          <div key={node.path} role="none">
             <TreeItem
               node={node}
               depth={depth}
@@ -49,7 +49,9 @@ function TreeLevel({ dirPath, depth }: { dirPath: string; depth: number }) {
               onToggle={() => node.dirPath && toggleExpanded(node.dirPath)}
             />
             {isOpen && node.dirPath ? (
-              <TreeLevel dirPath={node.dirPath} depth={depth + 1} />
+              <div role="group">
+                <TreeLevel dirPath={node.dirPath} depth={depth + 1} />
+              </div>
             ) : null}
           </div>
         );
@@ -210,7 +212,8 @@ export function FileTree({ rootPath }: { rootPath: string }) {
       try {
         // Flush the open note before paths change under it (as renamePage
         // does); a pending autosave must not write through a stale path.
-        await useEditorStore.getState().saveNow();
+        const saved = await useEditorStore.getState().saveNow();
+        if (!saved.ok && saved.reason !== "readOnly") throw new Error(saved.message);
         if (t.kind === "line") {
           await applyLineDrop(node, t.line);
         } else {
@@ -254,11 +257,19 @@ export function FileTree({ rootPath }: { rootPath: string }) {
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <div
+          role="tree"
+          aria-label={t("sidebar.pages")}
+          tabIndex={0}
           className={cn(
             "flex-1 overflow-y-auto px-2 pb-4 transition-colors duration-(--dur-fast)",
+            "outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/50 focus-visible:ring-inset",
             rootIsTarget && "rounded-md bg-accent-blue-soft/40 ring-1 ring-accent-blue/30 ring-inset",
           )}
           data-drop-dir={rootPath}
+          onFocus={(event) => {
+            if (event.target !== event.currentTarget) return;
+            event.currentTarget.querySelector<HTMLElement>('[role="treeitem"]')?.focus();
+          }}
         >
           <TreeLevel dirPath={rootPath} depth={0} />
         </div>

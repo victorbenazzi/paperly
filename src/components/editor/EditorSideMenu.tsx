@@ -17,8 +17,13 @@ import {
   createBlockDropIndicator,
   hideBlockDropIndicator,
   positionBlockDropIndicator,
-  type BlockDropIndicatorBounds,
 } from "./blockDropIndicator";
+import {
+  captureBlockDomSnapshot,
+  findBlockElement,
+  isDragHandle,
+  type BlockDomSnapshot,
+} from "./blocknoteDomAdapter";
 import { canReorderBlock, reorderBlock, resolveVerticalDropTarget, type BlockDropPlacement } from "./blockReorder";
 
 const DRAG_THRESHOLD_PX = 4;
@@ -29,24 +34,6 @@ type ActiveDrop = {
   id: string;
   placement: BlockDropPlacement;
 };
-
-function isDragHandle(target: EventTarget | null): boolean {
-  return target instanceof Element && Boolean(target.closest(".bn-block-drag-handle"));
-}
-
-function findBlockElement(editorRoot: HTMLElement, blockId: string): HTMLElement | null {
-  return (
-    Array.from(editorRoot.querySelectorAll<HTMLElement>(".bn-block-outer[data-id]")).find(
-      (element) => element.dataset.id === blockId,
-    ) ?? null
-  );
-}
-
-function blockRowBounds(element: HTMLElement): BlockDropIndicatorBounds {
-  const row = Array.from(element.children).find((child) => child.classList.contains("bn-block"));
-  const rect = (row ?? element).getBoundingClientRect();
-  return { top: rect.top, bottom: rect.bottom, left: rect.left, right: rect.right };
-}
 
 function sideMenuDataAttributes(
   editor: BlockNoteEditor,
@@ -125,6 +112,19 @@ function PointerReorderSideMenu() {
       let sourceElement: HTMLElement | null = null;
       let activeDrop: ActiveDrop | null = null;
       let dropIndicator: HTMLElement | null = null;
+      let snapshot: BlockDomSnapshot = { candidates: [], bounds: new Map() };
+      let latestPointerY = startY;
+      let frameId = 0;
+      let ending = false;
+      let resizeObserver: ResizeObserver | null = null;
+      let mutationObserver: MutationObserver | null = null;
+
+      const refreshSnapshot = () => {
+        const editorRoot = editor.domElement;
+        snapshot = editorRoot
+          ? captureBlockDomSnapshot(editorRoot, (id) => canReorderBlock(editor, block.id, id))
+          : { candidates: [], bounds: new Map() };
+      };
 
       const clearDrop = () => {
         activeDrop = null;
@@ -132,6 +132,13 @@ function PointerReorderSideMenu() {
       };
 
       const cleanup = () => {
+        ending = true;
+        resizeObserver?.disconnect();
+        mutationObserver?.disconnect();
+        resizeObserver = null;
+        mutationObserver = null;
+        if (frameId !== 0) cancelAnimationFrame(frameId);
+        frameId = 0;
         clearDrop();
         dropIndicator?.remove();
         dropIndicator = null;
@@ -142,6 +149,55 @@ function PointerReorderSideMenu() {
         window.removeEventListener("pointerup", onPointerUp, true);
         window.removeEventListener("pointercancel", onPointerCancel, true);
         cleanupRef.current = () => {};
+      };
+
+      const processPointer = () => {
+        frameId = 0;
+        clearDrop();
+
+        const drop = resolveVerticalDropTarget(snapshot.candidates, latestPointerY);
+        const bounds = drop ? snapshot.bounds.get(drop.id) : null;
+        if (drop && bounds) {
+          if (!dropIndicator) dropIndicator = createBlockDropIndicator(document);
+          positionBlockDropIndicator(dropIndicator, bounds, drop.placement);
+          activeDrop = { id: drop.id, placement: drop.placement };
+        }
+
+        const scrollRoot = editor.domElement?.closest<HTMLElement>("[data-scroll-root]");
+        if (!scrollRoot) return;
+        const rect = scrollRoot.getBoundingClientRect();
+        const previousScrollTop = scrollRoot.scrollTop;
+        if (latestPointerY < rect.top + SCROLL_EDGE_PX) scrollRoot.scrollTop -= SCROLL_STEP_PX;
+        if (latestPointerY > rect.bottom - SCROLL_EDGE_PX) scrollRoot.scrollTop += SCROLL_STEP_PX;
+        if (!ending && scrollRoot.scrollTop !== previousScrollTop) {
+          refreshSnapshot();
+          frameId = requestAnimationFrame(processPointer);
+        }
+      };
+
+      const refreshAfterLayoutChange = () => {
+        if (!started || ending) return;
+        refreshSnapshot();
+        if (frameId === 0) frameId = requestAnimationFrame(processPointer);
+      };
+
+      const observeLayoutChanges = () => {
+        const editorRoot = editor.domElement;
+        if (!editorRoot) return;
+
+        if (typeof ResizeObserver !== "undefined") {
+          resizeObserver = new ResizeObserver(refreshAfterLayoutChange);
+          resizeObserver.observe(editorRoot);
+        }
+        if (typeof MutationObserver !== "undefined") {
+          mutationObserver = new MutationObserver(refreshAfterLayoutChange);
+          mutationObserver.observe(editorRoot, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ["class", "style", "data-id"],
+          });
+        }
       };
 
       const onPointerMove = (moveEvent: PointerEvent) => {
@@ -159,46 +215,23 @@ function PointerReorderSideMenu() {
             ? findBlockElement(editor.domElement, block.id)
             : null;
           sourceElement?.setAttribute("data-editor-drag-source", "");
+          refreshSnapshot();
+          observeLayoutChanges();
         }
 
         moveEvent.preventDefault();
-        clearDrop();
-
-        const editorRoot = editor.domElement;
-        if (editorRoot) {
-          const candidates = Array.from(
-            editorRoot.querySelectorAll<HTMLElement>(".bn-block-outer[data-id]"),
-          ).flatMap((element) => {
-            const id = element.dataset.id;
-            if (!id || !canReorderBlock(editor, block.id, id)) return [];
-            return [{ id, ...blockRowBounds(element) }];
-          });
-          const drop = resolveVerticalDropTarget(candidates, moveEvent.clientY);
-          const targetElement = drop ? findBlockElement(editorRoot, drop.id) : null;
-          if (drop && targetElement) {
-            if (!dropIndicator) dropIndicator = createBlockDropIndicator(document);
-            positionBlockDropIndicator(
-              dropIndicator,
-              blockRowBounds(targetElement),
-              drop.placement,
-            );
-            activeDrop = {
-              id: drop.id,
-              placement: drop.placement,
-            };
-          }
-        }
-
-        const scrollRoot = editorRoot?.closest<HTMLElement>("[data-scroll-root]");
-        if (scrollRoot) {
-          const rect = scrollRoot.getBoundingClientRect();
-          if (moveEvent.clientY < rect.top + SCROLL_EDGE_PX) scrollRoot.scrollTop -= SCROLL_STEP_PX;
-          if (moveEvent.clientY > rect.bottom - SCROLL_EDGE_PX) scrollRoot.scrollTop += SCROLL_STEP_PX;
-        }
+        latestPointerY = moveEvent.clientY;
+        if (frameId === 0) frameId = requestAnimationFrame(processPointer);
       };
 
       const onPointerUp = (upEvent: PointerEvent) => {
         if (upEvent.pointerId !== pointerId) return;
+        ending = true;
+        if (frameId !== 0) {
+          cancelAnimationFrame(frameId);
+          frameId = 0;
+          processPointer();
+        }
         const drop = activeDrop;
         if (started) upEvent.preventDefault();
         cleanup();

@@ -4,6 +4,7 @@
  */
 export const EV = {
   fsChanged: "fs://changed",
+  appCloseRequested: "app://close-requested",
 } as const;
 
 export type EventName = (typeof EV)[keyof typeof EV];

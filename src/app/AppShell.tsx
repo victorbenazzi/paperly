@@ -1,27 +1,42 @@
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 
 import { cn } from "@/lib/utils";
 import { Sidebar, SidebarEdgeToggle } from "@/components/layout/Sidebar";
 import { MainHeader } from "@/components/layout/MainHeader";
-import { AgentPanel } from "@/components/layout/AgentPanel";
 import { NoteView } from "@/components/editor/NoteView";
 import { NoteEditor } from "@/components/editor/NoteEditor";
 import { ImageView } from "@/components/editor/ImageView";
 import { ExternalEditBanner } from "@/components/editor/ExternalEditBanner";
+import { AppCloseGuard } from "@/components/editor/AppCloseGuard";
+import { DeletePageDialog } from "@/components/page/DeletePageDialog";
 import { OutlineRail } from "@/components/page/OutlineRail";
-import { QuickSwitcher } from "@/components/search/QuickSwitcher";
-import { FullTextSearch } from "@/components/search/FullTextSearch";
-import { SettingsDialog } from "@/components/settings/SettingsDialog";
 import { IMAGE_EXTS, isMarkdown } from "@/features/tree/tree.types";
 import { WelcomeScreen } from "@/app/WelcomeScreen";
 import { useUiStore } from "@/features/ui/ui.store";
 import { useVaultsStore, activeVault } from "@/features/vaults/vaults.store";
 import { useNavStore } from "@/features/nav/nav.store";
+import { useSearchStore } from "@/features/search/search.store";
 import { useWorkspacePersistence } from "@/features/vaults/workspace.persist";
 import { useWatcherIntegration } from "@/features/watcher/useWatcherIntegration";
 import { useKeyboardShortcuts } from "@/features/keybindings/useKeyboardShortcuts";
 import { checkSilent } from "@/features/updates/updates.service";
+
+const QuickSwitcher = lazy(() =>
+  import("@/components/search/QuickSwitcher").then((module) => ({
+    default: module.QuickSwitcher,
+  })),
+);
+const FullTextSearch = lazy(() =>
+  import("@/components/search/FullTextSearch").then((module) => ({
+    default: module.FullTextSearch,
+  })),
+);
+const SettingsDialog = lazy(() =>
+  import("@/components/settings/SettingsDialog").then((module) => ({
+    default: module.SettingsDialog,
+  })),
+);
 
 /** Vault open, no note selected: a quiet nudge instead of the onboarding. */
 function EmptyNoteHint() {
@@ -37,13 +52,15 @@ export function AppShell() {
   const { t } = useTranslation();
   const sidebarOpen = useUiStore((s) => s.sidebarOpen);
   const sidebarWidth = useUiStore((s) => s.sidebarWidth);
-  const agentPanelOpen = useUiStore((s) => s.agentPanelOpen);
   const hydrate = useVaultsStore((s) => s.hydrate);
   const hydrated = useVaultsStore((s) => s.hydrated);
   const vaultError = useVaultsStore((s) => s.error);
   const activeVaultId = useVaultsStore((s) => s.activeVaultId);
   const vault = useVaultsStore((s) => activeVault(s));
   const openPath = useNavStore((s) => s.openPath);
+  const quickSwitcherOpen = useSearchStore((s) => s.quickSwitcherOpen);
+  const fullTextSearchOpen = useSearchStore((s) => s.fullTextSearchOpen);
+  const settingsOpen = useUiStore((s) => s.settingsOpen);
 
   useEffect(() => {
     void hydrate();
@@ -110,11 +127,13 @@ export function AppShell() {
         </div>
       </main>
 
-      {agentPanelOpen ? <AgentPanel /> : null}
-
-      <QuickSwitcher />
-      <FullTextSearch />
-      <SettingsDialog />
+      <Suspense fallback={null}>
+        {quickSwitcherOpen ? <QuickSwitcher /> : null}
+        {fullTextSearchOpen ? <FullTextSearch /> : null}
+        {settingsOpen ? <SettingsDialog /> : null}
+      </Suspense>
+      <AppCloseGuard />
+      <DeletePageDialog />
     </div>
   );
 }

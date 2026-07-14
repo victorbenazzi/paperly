@@ -19,7 +19,10 @@ export async function renameVault(id: string, name: string): Promise<void> {
   if (!before) return;
 
   // Flush content before the path changes under the editor.
-  if (id === activeVaultId) await useEditorStore.getState().saveNow();
+  if (id === activeVaultId) {
+    const saved = await useEditorStore.getState().saveNow();
+    if (!saved.ok && saved.reason !== "readOnly") throw new Error(saved.message);
+  }
 
   const after = await useVaultsStore.getState().rename(id, name);
   if (after.path === before.path) return;

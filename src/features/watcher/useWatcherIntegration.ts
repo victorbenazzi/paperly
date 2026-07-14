@@ -1,7 +1,7 @@
 import { useEffect } from "react";
-import { listen } from "@tauri-apps/api/event";
 
 import { EV, type FsChangedPayload } from "@/lib/events";
+import { listenAppEvent } from "@/lib/appEvents";
 import { CMD, ipc } from "@/lib/ipc";
 import { useTreeStore } from "@/features/tree/tree.store";
 import { usePageMetaStore } from "@/features/pages/pageMeta.store";
@@ -34,8 +34,9 @@ export function useWatcherIntegration(vaultId: string | null) {
 
   useEffect(() => {
     let unlisten: (() => void) | null = null;
-    void listen<FsChangedPayload>(EV.fsChanged, (event) => {
-      const { vaultId: eventVaultId, paths } = event.payload;
+    let disposed = false;
+    void listenAppEvent<FsChangedPayload>(EV.fsChanged, (payload) => {
+      const { vaultId: eventVaultId, paths } = payload;
       if (eventVaultId !== vaultId) return;
 
       useTreeStore.getState().handleFsChange(paths);
@@ -56,7 +57,10 @@ export function useWatcherIntegration(vaultId: string | null) {
           if (current.path !== openPath) return;
           if (file.content === current.lastSavedContent) return;
 
-          const isDirty = current.status === "dirty" || current.status === "saving";
+          const isDirty =
+            current.status === "dirty" ||
+            current.status === "saving" ||
+            current.status === "error";
           useExternalEditStore.getState().setEdit({
             kind: isDirty ? "conflict" : "reload",
             path: openPath,
@@ -66,10 +70,14 @@ export function useWatcherIntegration(vaultId: string | null) {
           // file may have been deleted; ignore
         }
       })();
-    }).then((fn) => {
-      unlisten = fn;
-    });
+    })
+      .then((fn) => {
+        if (disposed) fn();
+        else unlisten = fn;
+      })
+      .catch((err) => console.error("watcher event listener failed:", err));
     return () => {
+      disposed = true;
       unlisten?.();
     };
   }, [vaultId]);

@@ -1,9 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Picker } from "emoji-mart";
-import data from "@emoji-mart/data";
-import i18nEn from "@emoji-mart/data/i18n/en.json";
-import i18nPt from "@emoji-mart/data/i18n/pt.json";
 
 import { useThemeStore } from "@/features/theme/theme.store";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -23,20 +19,32 @@ export function EmojiGrid({ onPick }: { onPick: (emoji: string) => void }) {
   useEffect(() => {
     const host = ref.current;
     if (!host) return;
-    const picker = new Picker({
-      data,
-      i18n: i18n.language.startsWith("pt") ? i18nPt : i18nEn,
-      theme: effective,
-      set: "native",
-      previewPosition: "none",
-      skinTonePosition: "search",
-      autoFocus: true,
-      onEmojiSelect: (e: { native?: string }) => {
-        if (e.native) onPickRef.current(e.native);
-      },
-    }) as unknown as HTMLElement;
-    host.replaceChildren(picker);
-    return () => host.replaceChildren();
+    let cancelled = false;
+    void Promise.all([
+      import("emoji-mart"),
+      import("@emoji-mart/data"),
+      import("@emoji-mart/data/i18n/en.json"),
+      import("@emoji-mart/data/i18n/pt.json"),
+    ]).then(([emojiMart, dataModule, enModule, ptModule]) => {
+      if (cancelled) return;
+      const picker = new emojiMart.Picker({
+        data: dataModule.default,
+        i18n: i18n.language.startsWith("pt") ? ptModule.default : enModule.default,
+        theme: effective,
+        set: "native",
+        previewPosition: "none",
+        skinTonePosition: "search",
+        autoFocus: true,
+        onEmojiSelect: (emoji: { native?: string }) => {
+          if (emoji.native) onPickRef.current(emoji.native);
+        },
+      }) as unknown as HTMLElement;
+      host.replaceChildren(picker);
+    });
+    return () => {
+      cancelled = true;
+      host.replaceChildren();
+    };
   }, [effective, i18n.language]);
 
   return <div ref={ref} />;

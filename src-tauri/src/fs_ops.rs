@@ -88,17 +88,6 @@ fn io_error(ctx: &str, e: std::io::Error) -> AppError {
     }
 }
 
-fn require_within_roots(app: &AppHandle, path: &str) -> AppResult<()> {
-    let cache = app.state::<Arc<VaultsCache>>();
-    let roots = cache.roots();
-    if roots.is_empty() {
-        return Err(AppError::PathNotAllowed(
-            "no vault roots registered yet".into(),
-        ));
-    }
-    paths::ensure_within_roots(path, &roots)
-}
-
 fn require_existing_within_roots(app: &AppHandle, path: &str) -> AppResult<()> {
     let cache = app.state::<Arc<VaultsCache>>();
     let roots = cache.roots();
@@ -342,16 +331,7 @@ pub fn write_file_text(app: &AppHandle, path: &str, content: &str) -> AppResult<
 }
 
 pub fn atomic_write(path: &Path, bytes: &[u8]) -> AppResult<()> {
-    let tmp = path.with_extension(format!(
-        "{}.paperly.tmp",
-        path.extension().and_then(|s| s.to_str()).unwrap_or("")
-    ));
-    fs::write(&tmp, bytes).map_err(|e| io_error("write tmp", e))?;
-    fs::rename(&tmp, path).map_err(|e| {
-        let _ = fs::remove_file(&tmp);
-        io_error("rename", e)
-    })?;
-    Ok(())
+    crate::atomic_file::write(path, bytes)
 }
 
 /// Validate a user-supplied name component used for create/rename.
@@ -412,13 +392,19 @@ pub fn create_dir(app: &AppHandle, parent: &str, name: &str) -> AppResult<String
 /// Move a file or folder to the macOS Trash (recoverable). Notes are user
 /// data: never permanently delete from the UI.
 pub fn delete_path(app: &AppHandle, path: &str) -> AppResult<()> {
+    validate_delete_path(app, path)?;
+    let target = Path::new(path);
+    trash::delete(target).map_err(|e| AppError::Other(format!("move to trash: {e}")))?;
+    Ok(())
+}
+
+pub fn validate_delete_path(app: &AppHandle, path: &str) -> AppResult<()> {
     require_existing_within_roots(app, path)?;
     let target = Path::new(path);
     refuse_vault_root(app, target, "delete")?;
     target
         .symlink_metadata()
         .map_err(|e| io_error("delete: stat", e))?;
-    trash::delete(target).map_err(|e| AppError::Other(format!("move to trash: {e}")))?;
     Ok(())
 }
 

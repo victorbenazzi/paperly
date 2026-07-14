@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Smile } from "lucide-react";
+import { ExternalLink, FileWarning, FolderOpen, Smile } from "lucide-react";
 import { useCreateBlockNote } from "@blocknote/react";
+import { en, pt } from "@blocknote/core/locales";
 import {
   FormattingToolbar,
   FormattingToolbarController,
@@ -18,6 +19,11 @@ import "./blocknote-theme.css";
 import { useThemeStore } from "@/features/theme/theme.store";
 import { useEditorStore } from "@/features/editor/editor.store";
 import { codec } from "@/features/editor/markdown/codec";
+import {
+  extractCompatibleTitle,
+  restoreCompatibleTitle,
+  type TitleProjection,
+} from "@/features/editor/markdown/titleProjection";
 import { ensureWikiIndex, resolveWikiLink } from "@/features/editor/markdown/wikiLinks";
 import { useTreeStore } from "@/features/tree/tree.store";
 import { useNavStore } from "@/features/nav/nav.store";
@@ -29,7 +35,9 @@ import { internalLinkDecorations } from "@/components/editor/internalLinks";
 import { useOutlineStore, type OutlineHeading } from "@/features/outline/outline.store";
 import { IconPickerPopover } from "@/components/page/EmojiPicker";
 import { EditorSideMenu } from "@/components/editor/EditorSideMenu";
-import { errorMessage } from "@/lib/ipc";
+import { paperlySchema } from "@/components/editor/RawMarkdownBlock";
+import { Button } from "@/components/ui/button";
+import { CMD, errorMessage, ipc } from "@/lib/ipc";
 
 function inlineText(content: unknown): string {
   if (!Array.isArray(content)) return "";
@@ -71,32 +79,46 @@ function NoteTitle({ path, onSubmit }: { path: string; onSubmit?: () => void }) 
   const { t } = useTranslation();
   const name = stripMdExt(path.split("/").pop() ?? "");
   const [draft, setDraft] = useState(name);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => setDraft(name), [name]);
+  useEffect(() => {
+    if (!useNavStore.getState().consumeFocus(path, "title")) return;
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    });
+  }, [path]);
 
-  const commit = async () => {
+  const commit = async (): Promise<string> => {
     const next = draft.trim();
     if (!next || next === name) {
       setDraft(name);
-      return;
+      return path;
     }
     try {
-      await renamePage(path, next);
+      return await renamePage(path, next);
     } catch (err) {
       console.error("title rename failed:", errorMessage(err));
       setDraft(name);
+      return path;
     }
   };
 
   return (
     <input
+      ref={inputRef}
       value={draft}
       onChange={(e) => setDraft(e.target.value)}
       onBlur={() => void commit()}
       onKeyDown={(e) => {
         if (e.key === "Enter") {
-          (e.target as HTMLInputElement).blur();
-          onSubmit?.();
+          e.preventDefault();
+          void (async () => {
+            const finalPath = await commit();
+            useNavStore.getState().requestFocus(finalPath, "editor");
+            onSubmit?.();
+          })();
         }
         if (e.key === "Escape") {
           setDraft(name);
@@ -157,13 +179,16 @@ function PageHeader({ path, onTitleSubmit }: { path: string; onTitleSubmit?: () 
  * instance across files).
  */
 export function NoteEditor({ path }: { path: string }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const language = (i18n.resolvedLanguage ?? i18n.language).toLowerCase();
   const effective = useThemeStore((s) => s.effective);
   const vault = useVaultsStore((s) => activeVault(s));
   const openNote = useNavStore((s) => s.open);
   const select = useTreeStore((s) => s.select);
   const editor = useCreateBlockNote(
     {
+      schema: paperlySchema,
+      dictionary: language.startsWith("pt") ? pt : en,
       uploadFile: vault ? (file: File) => uploadAssetToVault(vault.id, file) : undefined,
       resolveFileUrl: vault
         ? (url: string) => resolveVaultFileUrl(vault.path, url)
@@ -171,43 +196,69 @@ export function NoteEditor({ path }: { path: string }) {
       // Notion-style page links: emoji (or default glyph) + soft underline.
       extensions: vault ? [internalLinkDecorations(vault.path)] : undefined,
     },
-    [vault?.id],
+    [vault?.id, language],
   );
-  const [ready, setReady] = useState(false);
+  const [readyEditor, setReadyEditor] = useState<typeof editor | null>(null);
+  const ready = readyEditor === editor;
   const [loadError, setLoadError] = useState<string | null>(null);
   const loadedFor = useRef<string | null>(null);
+  const titleProjection = useRef<TitleProjection | null>(null);
+  const readOnlyInfo = useEditorStore((s) => s.readOnlyInfo);
 
   useEffect(() => {
     let cancelled = false;
+    let openedSessionId: number | null = null;
     void (async () => {
-      const body = await useEditorStore.getState().load(path);
+      const loaded = await useEditorStore.getState().load(path);
       if (cancelled) return;
-      if (body === null) {
-        setLoadError(useEditorStore.getState().error);
+      if (!loaded.ok) {
+        if (loaded.reason !== "staleSession") setLoadError(loaded.message);
         return;
       }
-      const vp = vault?.path;
+      openedSessionId = loaded.sessionId;
+      if (loaded.mode === "readOnly") {
+        setReadyEditor(editor);
+        return;
+      }
+      const vaultPath = vault?.path;
+      const fileTitle = stripMdExt(path.split("/").pop() ?? "");
+      const extracted = extractCompatibleTitle(loaded.body, fileTitle);
+      titleProjection.current = extracted.projection;
       // The index must be ready BEFORE the first parse, or every [[link]]
       // in the note would fail to resolve.
       if (vault) await ensureWikiIndex(vault.id);
-      const blocks = await codec.markdownToBlocks(editor, body, vp);
+      const blocks = await codec.markdownToBlocks(editor, extracted.body, vaultPath);
       if (cancelled) return;
       editor.replaceBlocks(editor.document, blocks);
       // Register the serializer only AFTER the initial content lands, so the
       // replaceBlocks onChange can never write a normalized doc on open.
-      useEditorStore.getState().registerSerializer(() => codec.blocksToMarkdown(editor, vp));
-      useEditorStore.getState().registerReloader(async (newBody) => {
-        const newBlocks = await codec.markdownToBlocks(editor, newBody, vp);
+      useEditorStore
+        .getState()
+        .registerSerializer(loaded.sessionId, async () => {
+          const body = await codec.blocksToMarkdown(editor, vaultPath);
+          const currentPath = useEditorStore.getState().path ?? path;
+          const currentTitle = stripMdExt(currentPath.split("/").pop() ?? "");
+          return restoreCompatibleTitle(body, currentTitle, titleProjection.current);
+        });
+      useEditorStore.getState().registerReloader(loaded.sessionId, async (newBody: string) => {
+        const currentPath = useEditorStore.getState().path ?? path;
+        const currentTitle = stripMdExt(currentPath.split("/").pop() ?? "");
+        const next = extractCompatibleTitle(newBody, currentTitle);
+        titleProjection.current = next.projection;
+        const newBlocks = await codec.markdownToBlocks(editor, next.body, vaultPath);
         editor.replaceBlocks(editor.document, newBlocks);
       });
       useOutlineStore.getState().set(collectHeadings(editor.document));
       loadedFor.current = path;
-      setReady(true);
+      setReadyEditor(editor);
+      if (useNavStore.getState().consumeFocus(path, "editor")) {
+        requestAnimationFrame(() => editor.focus());
+      }
     })();
     return () => {
       cancelled = true;
       useOutlineStore.getState().clear();
-      void useEditorStore.getState().close();
+      if (openedSessionId !== null) void useEditorStore.getState().close(openedSessionId);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editor, path]);
@@ -234,8 +285,9 @@ export function NoteEditor({ path }: { path: string }) {
       ? abs
       : resolveWikiLink(stripMdExt(href.split("/").pop() ?? href));
     if (resolved) {
-      openNote(resolved);
-      select(resolved);
+      void openNote(resolved).then((opened) => {
+        if (opened) select(resolved);
+      });
     }
   };
 
@@ -247,11 +299,63 @@ export function NoteEditor({ path }: { path: string }) {
     );
   }
 
+  if (readOnlyInfo) {
+    const size = new Intl.NumberFormat(undefined, {
+      style: "unit",
+      unit: "megabyte",
+      maximumFractionDigits: 1,
+    }).format(readOnlyInfo.size / 1_000_000);
+    return (
+      <div className="mx-auto flex h-full max-w-3xl flex-col px-12 py-10">
+        <PageHeader path={path} />
+        <div className="mt-4 border-t border-hairline pt-6">
+          <div className="flex items-start gap-3 text-sm">
+            <FileWarning size={18} className="mt-0.5 shrink-0 text-warning" />
+            <div className="min-w-0 flex-1">
+              <p className="font-medium text-ink">{t("editor.readOnlyTitle")}</p>
+              <p className="mt-1 text-ink-muted">
+                {t(
+                  readOnlyInfo.reason === "truncated"
+                    ? "editor.readOnlyTruncated"
+                    : "editor.readOnlyEncoding",
+                  { size, encoding: readOnlyInfo.encoding },
+                )}
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => void ipc(CMD.openWithDefaultApp, { path })}
+                >
+                  <ExternalLink size={14} />
+                  {t("editor.openExternally")}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void ipc(CMD.revealInFinder, { path })}
+                >
+                  <FolderOpen size={14} />
+                  {t("tree.reveal")}
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto h-full max-w-3xl px-12 py-10">
       <PageHeader path={path} onTitleSubmit={() => editor.focus()} />
       {/* onClick handles in-vault note links; keyboard nav stays BlockNote's. */}
-      <div className={ready ? "" : "invisible"} onClick={handleEditorClick}>
+      <div
+        className={ready ? "" : "invisible"}
+        aria-busy={!ready}
+        data-editor-language={ready ? (language.startsWith("pt") ? "pt" : "en") : undefined}
+        onClick={handleEditorClick}
+      >
         <BlockNoteView
           editor={editor}
           theme={effective}
@@ -259,7 +363,9 @@ export function NoteEditor({ path }: { path: string }) {
           sideMenu={false}
           onChange={() => {
             useOutlineStore.getState().set(collectHeadings(editor.document));
-            if (loadedFor.current === path) useEditorStore.getState().scheduleSave();
+            if (loadedFor.current === path) {
+              useEditorStore.getState().scheduleSave(useEditorStore.getState().sessionId);
+            }
           }}
         >
           <FormattingToolbarController

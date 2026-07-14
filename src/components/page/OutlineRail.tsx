@@ -48,16 +48,32 @@ export function OutlineRail() {
   if (headings.length === 0) return null;
 
   const jump = (id: string) => {
-    blockEl(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    blockEl(id)?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth", block: "start" });
     setActiveId(id);
   };
 
   return (
     <div
+      role="navigation"
       aria-label={t("page.outline")}
-      className="absolute top-1/2 right-0 z-20 -translate-y-1/2"
+      aria-expanded={open}
+      tabIndex={0}
+      className="absolute top-1/2 right-0 z-20 -translate-y-1/2 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/50"
       onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
+      onMouseLeave={(event) => {
+        if (!event.currentTarget.matches(":focus-within")) setOpen(false);
+      }}
+      onFocusCapture={() => setOpen(true)}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setOpen(false);
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        setOpen(false);
+        event.currentTarget.focus();
+      }}
     >
       <div
         className={cn(
@@ -69,6 +85,7 @@ export function OutlineRail() {
         {headings.map((h) => (
           <div
             key={h.id}
+            aria-hidden="true"
             style={{ width: barWidth(h.level) }}
             className={cn(
               "h-0.5 shrink-0 rounded-full transition-colors duration-(--dur-fast)",
@@ -94,7 +111,7 @@ export function OutlineRail() {
               style={{ paddingLeft: `${8 + (h.level - 1) * 14}px` }}
               className={cn(
                 "block w-full truncate rounded-sm py-1 pr-2 text-left text-[13px]",
-                "transition-colors duration-(--dur-fast)",
+                "transition-colors duration-(--dur-fast) outline-none focus-visible:ring-2 focus-visible:ring-accent-blue/50 focus-visible:ring-inset",
                 h.id === activeId
                   ? "bg-hover-wash-strong text-ink"
                   : "text-ink-muted hover:bg-hover-wash hover:text-ink",

@@ -59,8 +59,8 @@ export function FullTextSearch() {
     };
   }, [query, open, vault, runSearch]);
 
-  const handleSelect = (path: string) => {
-    openNote(path);
+  const handleSelect = async (path: string) => {
+    if (!(await openNote(path))) return;
     select(path);
     close();
   };
@@ -97,7 +97,7 @@ export function FullTextSearch() {
                     <CommandItem
                       key={`${file.path}:${m.line}:${i}`}
                       value={`${file.path}:${m.line}:${i}`}
-                      onSelect={() => handleSelect(file.path)}
+                      onSelect={() => void handleSelect(file.path)}
                     >
                       <FileText size={14} className="shrink-0 text-ink-muted" />
                       <span className="truncate font-mono text-xs">
