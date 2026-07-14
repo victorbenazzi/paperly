@@ -92,3 +92,74 @@ test("recreates BlockNote with the Portuguese dictionary", async ({ page }) => {
     .toBeVisible();
   expect(consoleFailures).toEqual([]);
 });
+
+test("opens block actions from the drag handle and keeps every action functional", async ({
+  page,
+}) => {
+  const consoleFailures = collectConsoleFailures(page);
+  await openMockVault(page);
+
+  const paragraph = page.locator(".bn-block-outer", { hasText: "Welcome." }).first();
+  await paragraph.hover();
+  await page.getByRole("button", { name: "Open block menu", exact: true }).click();
+
+  await expect(page.getByRole("menuitem", { name: "Turn into", exact: true })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Duplicate", exact: true })).toBeVisible();
+  await expect(page.getByRole("menuitem", { name: "Delete", exact: true })).toBeVisible();
+
+  await page.getByRole("menuitem", { name: "Duplicate", exact: true }).click();
+  await expect(page.locator(".bn-block-outer", { hasText: "Welcome." })).toHaveCount(2);
+
+  const duplicate = page.locator(".bn-block-outer", { hasText: "Welcome." }).last();
+  await duplicate.hover();
+  await page.getByRole("button", { name: "Open block menu", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Turn into", exact: true }).hover();
+  await page.getByRole("menuitem", { name: "Heading 2", exact: true }).click();
+  await expect(duplicate.locator('[data-content-type="heading"]')).toHaveCount(1);
+
+  await duplicate.hover();
+  await page.getByRole("button", { name: "Open block menu", exact: true }).click();
+  await page.getByRole("menuitem", { name: "Delete", exact: true }).click();
+  await expect(page.locator(".bn-block-outer", { hasText: "Welcome." })).toHaveCount(1);
+  expect(consoleFailures).toEqual([]);
+});
+
+test("renders the formatting tooltip with a native attached arrow", async ({ page }) => {
+  const consoleFailures = collectConsoleFailures(page);
+  await openMockVault(page);
+
+  await page.evaluate(() => {
+    const inlineContent = document.querySelector(".bn-inline-content");
+    const text = inlineContent?.firstChild;
+    if (!(text instanceof Text)) throw new Error("Expected editable text");
+    const range = document.createRange();
+    range.setStart(text, 0);
+    range.setEnd(text, Math.min(7, text.length));
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+    selection?.addRange(range);
+    document.dispatchEvent(new Event("selectionchange"));
+  });
+  const bold = page.getByRole("button", { name: "Bold", exact: true });
+  await expect(bold).toBeVisible();
+  await bold.hover();
+
+  const tooltip = page.locator('[data-slot="tooltip-content"]', { hasText: "Bold" });
+  await expect(tooltip).toBeVisible();
+  const arrowStyles = await tooltip.locator("svg").evaluate((arrow) => {
+    const style = getComputedStyle(arrow);
+    return {
+      backgroundColor: style.backgroundColor,
+      transform: style.transform,
+      width: style.width,
+      height: style.height,
+    };
+  });
+  expect(arrowStyles).toEqual({
+    backgroundColor: "rgba(0, 0, 0, 0)",
+    transform: "none",
+    width: "10px",
+    height: "5px",
+  });
+  expect(consoleFailures).toEqual([]);
+});

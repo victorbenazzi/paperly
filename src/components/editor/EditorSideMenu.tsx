@@ -1,7 +1,8 @@
-import type { Block, BlockNoteEditor } from "@blocknote/core";
+import { editorHasBlockWithType, type Block, type BlockNoteEditor } from "@blocknote/core";
 import { SideMenuExtension } from "@blocknote/core/extensions";
 import {
   AddBlockButton,
+  blockTypeSelectItems,
   DragHandleMenu,
   SideMenuController,
   useBlockNoteEditor,
@@ -9,7 +10,7 @@ import {
   useExtension,
   useExtensionState,
 } from "@blocknote/react";
-import { GripVertical } from "lucide-react";
+import { Copy, GripVertical, Replace, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, type ComponentType, type HTMLAttributes } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -25,6 +26,12 @@ import {
   type BlockDomSnapshot,
 } from "./blocknoteDomAdapter";
 import { canReorderBlock, reorderBlock, resolveVerticalDropTarget, type BlockDropPlacement } from "./blockReorder";
+import {
+  canTurnMenuBlocksInto,
+  duplicateMenuBlocks,
+  removeMenuBlocks,
+  turnMenuBlocksInto,
+} from "./blockMenuActions";
 
 const DRAG_THRESHOLD_PX = 4;
 const SCROLL_EDGE_PX = 48;
@@ -34,6 +41,92 @@ type ActiveDrop = {
   id: string;
   placement: BlockDropPlacement;
 };
+
+function TurnIntoBlockItem({ block }: { block: Block<any, any, any> }) {
+  const { t } = useTranslation();
+  const editor = useBlockNoteEditor<any, any, any>();
+  const Components = useComponentsContext()!;
+
+  const items = useMemo(
+    () =>
+      blockTypeSelectItems(editor.dictionary).filter((item) =>
+        editorHasBlockWithType(
+          editor,
+          item.type,
+          Object.fromEntries(
+            Object.entries(item.props ?? {}).map(([name, value]) => [name, typeof value]),
+          ) as Record<string, "string" | "number" | "boolean">,
+        ),
+      ),
+    [editor],
+  );
+
+  if (!canTurnMenuBlocksInto(editor, block) || items.length === 0) return null;
+
+  return (
+    <Components.Generic.Menu.Root position="right" sub={true}>
+      <Components.Generic.Menu.Trigger sub={true}>
+        <Components.Generic.Menu.Item
+          className="bn-menu-item"
+          icon={<Replace size={16} />}
+          subTrigger={true}
+        >
+          {t("editor.blockActions.turnInto")}
+        </Components.Generic.Menu.Item>
+      </Components.Generic.Menu.Trigger>
+      <Components.Generic.Menu.Dropdown
+        className="bn-menu-dropdown bn-turn-into-menu"
+        sub={true}
+      >
+        {items.map((item) => {
+          const Icon = item.icon;
+          return (
+            <Components.Generic.Menu.Item
+              className="bn-menu-item"
+              icon={<Icon size={16} />}
+              key={`${item.type}:${JSON.stringify(item.props ?? {})}`}
+              onClick={() => turnMenuBlocksInto(editor, block, item)}
+            >
+              {item.name}
+            </Components.Generic.Menu.Item>
+          );
+        })}
+      </Components.Generic.Menu.Dropdown>
+    </Components.Generic.Menu.Root>
+  );
+}
+
+function BlockActionsMenu({ block }: { block: Block<any, any, any> }) {
+  const { t } = useTranslation();
+  const editor = useBlockNoteEditor<any, any, any>();
+  const Components = useComponentsContext()!;
+  const showTurnInto = canTurnMenuBlocksInto(editor, block);
+
+  return (
+    <DragHandleMenu>
+      {showTurnInto && (
+        <>
+          <TurnIntoBlockItem block={block} />
+          <Components.Generic.Menu.Divider />
+        </>
+      )}
+      <Components.Generic.Menu.Item
+        className="bn-menu-item"
+        icon={<Copy size={16} />}
+        onClick={() => duplicateMenuBlocks(editor, block)}
+      >
+        {t("editor.blockActions.duplicate")}
+      </Components.Generic.Menu.Item>
+      <Components.Generic.Menu.Item
+        className="bn-menu-item bn-block-menu-delete"
+        icon={<Trash2 size={16} />}
+        onClick={() => removeMenuBlocks(editor, block)}
+      >
+        {t("editor.blockActions.delete")}
+      </Components.Generic.Menu.Item>
+    </DragHandleMenu>
+  );
+}
 
 function sideMenuDataAttributes(
   editor: BlockNoteEditor,
@@ -52,7 +145,7 @@ function sideMenuDataAttributes(
   return attrs;
 }
 
-function PointerDragHandleButton() {
+function PointerDragHandleButton({ block }: { block: Block<any, any, any> }) {
   const { t } = useTranslation();
   const Components = useComponentsContext()!;
   const sideMenu = useExtension(SideMenuExtension);
@@ -72,7 +165,7 @@ function PointerDragHandleButton() {
           icon={<GripVertical size={24} />}
         />
       </Components.Generic.Menu.Trigger>
-      <DragHandleMenu />
+      <BlockActionsMenu block={block} />
     </Components.Generic.Menu.Root>
   );
 }
@@ -103,6 +196,7 @@ function PointerReorderSideMenu() {
   const onPointerDownCapture = useCallback(
     (event: React.PointerEvent<HTMLDivElement>) => {
       if (!block || event.button !== 0 || !isDragHandle(event.target)) return;
+      if ((event.nativeEvent as PointerEvent & { fakeEvent?: boolean }).fakeEvent) return;
 
       cleanupRef.current();
       const pointerId = event.pointerId;
@@ -144,7 +238,7 @@ function PointerReorderSideMenu() {
         dropIndicator = null;
         sourceElement?.removeAttribute("data-editor-drag-source");
         document.body.removeAttribute("data-editor-block-dragging");
-        sideMenu.unfreezeMenu();
+        if (started) sideMenu.unfreezeMenu();
         window.removeEventListener("pointermove", onPointerMove, true);
         window.removeEventListener("pointerup", onPointerUp, true);
         window.removeEventListener("pointercancel", onPointerCancel, true);
@@ -267,6 +361,11 @@ function PointerReorderSideMenu() {
         event.preventDefault();
         event.stopPropagation();
       }}
+      onPointerUpCapture={(event) => {
+        if (!suppressClickRef.current || !isDragHandle(event.target)) return;
+        event.preventDefault();
+        event.stopPropagation();
+      }}
       onClickCapture={(event) => {
         if (!suppressClickRef.current || !isDragHandle(event.target)) return;
         event.preventDefault();
@@ -275,7 +374,7 @@ function PointerReorderSideMenu() {
       }}
     >
       <AddBlockButton />
-      <PointerDragHandleButton />
+      {block && <PointerDragHandleButton block={block} />}
     </Root>
   );
 }

@@ -45,6 +45,43 @@
   -webkit-user-drag: none;
 }
 
+.bn-drag-handle-menu {
+  min-width: 184px;
+}
+
+.bn-drag-handle-menu .bn-menu-item,
+.bn-turn-into-menu .bn-menu-item {
+  cursor: pointer;
+}
+
+.bn-turn-into-menu {
+  min-width: 216px;
+  max-height: min(480px, calc(100vh - 24px));
+  overflow-y: auto;
+}
+
+.bn-block-menu-delete {
+  color: var(--danger);
+}
+
+/* BlockNote ships a rotated square around Radix's native SVG arrow. Resetting
+   it keeps the tooltip attached to the toolbar button at every zoom level. */
+.bn-container [data-slot="tooltip-content"] {
+  border: 1px solid color-mix(in srgb, var(--canvas) 14%, transparent);
+  background: var(--ink);
+  color: var(--canvas);
+  box-shadow: var(--elevation-soft);
+}
+
+.bn-container [data-slot="tooltip-content"] svg {
+  width: 10px;
+  height: 5px;
+  transform: none;
+  border-radius: 0;
+  background: transparent;
+  fill: var(--ink);
+}
+
 body[data-editor-block-dragging],
 body[data-editor-block-dragging] * {
   cursor: grabbing !important;
