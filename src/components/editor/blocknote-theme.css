@@ -38,6 +38,23 @@
   background: var(--accent-soft);
 }
 
+/* Pointer based block movement works consistently in the desktop webview. */
+.bn-side-menu .bn-block-drag-handle {
+  cursor: grab;
+  touch-action: none;
+  -webkit-user-drag: none;
+}
+
+body[data-editor-block-dragging],
+body[data-editor-block-dragging] * {
+  cursor: grabbing !important;
+  user-select: none !important;
+}
+
+.bn-editor .bn-block-outer[data-editor-drag-source] {
+  opacity: 0.45;
+}
+
 /*
  * Notion-style internal page links. The decoration plugin (internalLinks.ts)
  * wraps the link text in a span tagged data-internal-link / data-icon, nested

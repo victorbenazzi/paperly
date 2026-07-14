@@ -51,6 +51,7 @@
   },
   "editor": {
     "empty": "Selecione uma nota na barra lateral, ou crie uma nova página.",
+    "blockMenu": "Abrir menu do bloco",
     "externalEditMessage": "Esta nota foi editada fora do Paperly.",
     "conflictMessage": "Esta nota foi editada fora do Paperly enquanto você tinha alterações não salvas.",
     "reloadFromDisk": "Recarregar do disco",

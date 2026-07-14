@@ -28,6 +28,7 @@ import { renamePage } from "@/features/pages/renamePage";
 import { internalLinkDecorations } from "@/components/editor/internalLinks";
 import { useOutlineStore, type OutlineHeading } from "@/features/outline/outline.store";
 import { IconPickerPopover } from "@/components/page/EmojiPicker";
+import { EditorSideMenu } from "@/components/editor/EditorSideMenu";
 import { errorMessage } from "@/lib/ipc";
 
 function inlineText(content: unknown): string {
@@ -255,6 +256,7 @@ export function NoteEditor({ path }: { path: string }) {
           editor={editor}
           theme={effective}
           formattingToolbar={false}
+          sideMenu={false}
           onChange={() => {
             useOutlineStore.getState().set(collectHeadings(editor.document));
             if (loadedFor.current === path) useEditorStore.getState().scheduleSave();
@@ -274,6 +276,7 @@ export function NoteEditor({ path }: { path: string }) {
               </FormattingToolbar>
             )}
           />
+          <EditorSideMenu />
         </BlockNoteView>
       </div>
     </div>

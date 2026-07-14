@@ -51,6 +51,7 @@
   },
   "editor": {
     "empty": "Select a note in the sidebar, or create a new page.",
+    "blockMenu": "Open block menu",
     "externalEditMessage": "This note was edited outside Paperly.",
     "conflictMessage": "This note was edited outside Paperly while you had unsaved changes.",
     "reloadFromDisk": "Reload from disk",
